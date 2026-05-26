@@ -194,7 +194,7 @@ const LandingFooter = () => {
             Secure Payments
           </p>
           <PaymentMethods variant="dark" />
-          <DodoPaymentsBadge variant="dark" />
+
         </motion.div>
 
         {/* Bottom bar */}
