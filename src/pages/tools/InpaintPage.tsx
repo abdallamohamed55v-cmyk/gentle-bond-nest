@@ -21,6 +21,7 @@ const GRADIENT_BORDER =
 const InpaintPage = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { hasEnoughCredits } = useCredits();
   const [stage, setStage] = useState<Stage>("landing");
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
