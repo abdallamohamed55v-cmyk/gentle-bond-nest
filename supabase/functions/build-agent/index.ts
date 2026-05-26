@@ -19,11 +19,22 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { Sandbox } from "npm:@e2b/code-interpreter@1.2.0";
 import { createJob, runInBackground, JobWriter } from "../_shared/jobs.ts";
 import { getRouter, ROUTER_MODELS, lovableEquivalent } from "../_shared/llm-router.ts";
+import {
+  bootstrapClaude,
+  runClaudeStream,
+  listChangedFiles,
+  DEFAULT_CODING_MODEL,
+  SANDBOX_APP_DIR,
+  type ClaudeEvent,
+} from "../_shared/claude-code.ts";
 
-// Coding models: moonshotai/kimi-k2.6 via OpenRouter (key in api_keys.service='openrouter'|'agentrouter').
-// Falls back to Lovable Gateway equivalent if router key is missing.
+// Primary engine: Claude Code CLI inside the project's E2B sandbox, routed
+// through the free-claude-code proxy to Kimi K2 on OpenRouter.
+// Fallback (AI SDK + fs_* tools) is preserved for when the sandbox or the
+// OpenRouter key is unavailable.
 const BUILD_MODEL = ROUTER_MODELS.coding;
 const NAME_MODEL = ROUTER_MODELS.coding;
+const CLAUDE_PROXY_MODEL = DEFAULT_CODING_MODEL;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -542,6 +553,17 @@ for (const f of ['vite.config.ts','vite.config.js','vite.config.mts','vite.confi
       const abs = dest.startsWith("/") ? dest : `${SANDBOX_DIR}/${dest}`;
       const out = await sb.commands.run(`mkdir -p $(dirname ${JSON.stringify(abs)}) && curl -sSL ${JSON.stringify(url)} -o ${JSON.stringify(abs)} && wc -c < ${JSON.stringify(abs)}`, { timeoutMs: 120000 });
       return { ok: true, data: { path: abs, bytes: (out.stdout ?? "").trim(), exitCode: out.exitCode ?? 0 } };
+    }
+    if (action === "bootstrap_claude") {
+      if (!row?.sandbox_id) return { ok: false, error: "no_running_sandbox" };
+      const router = await getRouter();
+      if (!router?.key) return { ok: false, error: "openrouter_key_missing" };
+      const sb = await Sandbox.connect(row.sandbox_id, { apiKey: E2B_API_KEY });
+      await sb.setTimeout(SANDBOX_TIMEOUT_MS);
+      const res = await bootstrapClaude(sb, router.key, CLAUDE_PROXY_MODEL);
+      return res.ok
+        ? { ok: true, data: { ready: true, log: res.log } }
+        : { ok: false, error: `bootstrap_failed: ${res.log}` };
     }
     return { ok: false, error: `unknown sandbox action: ${action}` };
   } catch (e) {
@@ -1148,6 +1170,123 @@ const SYSTEM_PROMPT = `أنت Megsy Builder — مهندس ويب عالمي ي�
 بعد آخر استدعاء أداة، اكتب سطر أو سطرَين فقط بالعربية + وسوم \`<change file="path">سطر واحد</change>\` لكل ملف تم لمسه.`;
 
 
+// ───────── Claude Code orchestrator ─────────
+// Returns true if Claude Code handled the request (events were emitted via
+// `emit` and assistant text accumulated into `state`). Returns false if the
+// caller should fall back to the legacy AI SDK + fs_* loop.
+type ClaudeRunState = { text: string; fileEvents: Array<{ action: string; path: string; to?: string }> };
+
+async function ensureSandboxRunning(svc: ReturnType<typeof createClient>, projectId: string): Promise<{ ok: true; sandboxId: string } | { ok: false; error: string }> {
+  const { data: row } = await svc
+    .from("project_sandboxes")
+    .select("sandbox_id, status")
+    .eq("project_id", projectId)
+    .maybeSingle();
+  if (row?.sandbox_id && row.status === "running") return { ok: true, sandboxId: row.sandbox_id };
+  const started = await sandboxAction(svc, projectId, "start", {});
+  if (!started.ok) return { ok: false, error: started.error };
+  const data = (started as { data?: { sandbox_id?: string } }).data ?? {};
+  if (!data.sandbox_id) return { ok: false, error: "sandbox_start_no_id" };
+  return { ok: true, sandboxId: data.sandbox_id };
+}
+
+function buildClaudePrompt(history: Array<{ role: "user" | "assistant"; content: string }>, latest: string): string {
+  const recent = history.slice(-6).map((m) => {
+    const role = m.role === "user" ? "المستخدم" : "المساعد";
+    return `${role}: ${compactMessageContent(m.content).slice(0, 800)}`;
+  }).join("\n\n");
+  const preamble = `أنت تعمل داخل مشروع React + Vite + Tailwind + shadcn/ui موجود في /home/user/app.\nعدّل الملفات مباشرة (Edit / Write / MultiEdit) وكوّن مكونات أنيقة عالية الجودة.\nاكتب محتوى عربي حقيقي، RTL، semantic tokens فقط، بدون ألوان خام.\nبعد الانتهاء لخّص باختصار ما فعلته بالعربية.`;
+  return recent
+    ? `${preamble}\n\n# سياق المحادثة السابقة\n${recent}\n\n# طلب المستخدم الحالي\n${latest}`
+    : `${preamble}\n\n# طلب المستخدم\n${latest}`;
+}
+
+async function tryClaudeCode(
+  ctx: Ctx,
+  userPrompt: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+  emit: (e: Record<string, unknown>) => void | Promise<void>,
+  state: ClaudeRunState,
+): Promise<boolean> {
+  if (!E2B_API_KEY) return false;
+  const router = await getRouter();
+  if (!router?.key) return false;
+
+  // 1) Ensure sandbox is up
+  await emit({ type: "step", text: "sandbox: تشغيل/الاتصال بالـ E2B" });
+  const sbRes = await ensureSandboxRunning(ctx.supabase, ctx.projectId);
+  if (!sbRes.ok) {
+    await emit({ type: "warn", text: `سندبوكس غير متاح: ${sbRes.error} — رجوع للوضع الاحتياطي` });
+    return false;
+  }
+
+  const sb = await Sandbox.connect(sbRes.sandboxId, { apiKey: E2B_API_KEY });
+  await sb.setTimeout(SANDBOX_TIMEOUT_MS);
+
+  // 2) Bootstrap Claude Code (idempotent)
+  await emit({ type: "step", text: "claude: تهيئة المحرك" });
+  const boot = await bootstrapClaude(sb, router.key, CLAUDE_PROXY_MODEL);
+  if (!boot.ok) {
+    await emit({ type: "warn", text: `Claude bootstrap فشل — رجوع للوضع الاحتياطي\n${boot.log.slice(-300)}` });
+    return false;
+  }
+
+  // 3) Run claude -p with prompt
+  const sinceSec = Math.floor(Date.now() / 1000) - 5;
+  const prompt = buildClaudePrompt(history, userPrompt);
+  await emit({ type: "step", text: "claude: بدء التنفيذ" });
+
+  try {
+    for await (const evt of runClaudeStream(sb, prompt, { cwd: SANDBOX_APP_DIR, maxTurns: 50 })) {
+      if (evt.type === "text") {
+        state.text += evt.delta;
+        await emit({ type: "text", delta: evt.delta });
+      } else if (evt.type === "file") {
+        state.fileEvents.push({ action: evt.action, path: evt.path, to: evt.to });
+        await emit({ type: "file", action: evt.action, path: evt.path, to: evt.to });
+      } else if (evt.type === "step" || evt.type === "warn" || evt.type === "tool_use" || evt.type === "tool_result") {
+        await emit(evt as Record<string, unknown>);
+      } else if (evt.type === "error") {
+        await emit({ type: "warn", text: evt.message });
+      } else if (evt.type === "done") {
+        // continue to file sync
+      }
+    }
+  } catch (e) {
+    await emit({ type: "warn", text: `claude execution error: ${(e as Error).message}` });
+    return false;
+  }
+
+  // 4) Sync changed files back to Supabase (best-effort, non-blocking on errors)
+  try {
+    const changed = await listChangedFiles(sb, sinceSec, SANDBOX_APP_DIR);
+    let synced = 0;
+    for (const rel of changed) {
+      if (rel.startsWith("node_modules") || rel.startsWith(".git")) continue;
+      try {
+        const content = await sb.files.read(`${SANDBOX_APP_DIR}/${rel}`);
+        const text = typeof content === "string" ? content : new TextDecoder().decode(content as Uint8Array);
+        if (text.length > 256 * 1024) continue;
+        await ctx.supabase.from("ai_project_files").upsert(
+          { project_id: ctx.projectId, path: rel, content: text, updated_at: new Date().toISOString() },
+          { onConflict: "project_id,path" },
+        );
+        // record once if not already in fileEvents
+        if (!state.fileEvents.find((f) => f.path === rel)) {
+          state.fileEvents.push({ action: "update", path: rel });
+          await emit({ type: "file", action: "update", path: rel });
+        }
+        synced++;
+      } catch { /* ignore individual file errors */ }
+    }
+    if (synced > 0) await emit({ type: "step", text: `synced ${synced} files إلى التخزين` });
+  } catch (e) {
+    console.warn("claude file sync warning:", (e as Error).message);
+  }
+
+  return true;
+}
+
 // ───────── HTTP handler ─────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
@@ -1261,45 +1400,56 @@ Deno.serve(async (req) => {
           if (singleMessage) await saveMessage(ctx, "user", singleMessage);
           assistantMessageId = await createMessage(ctx, "assistant", "...");
 
-          const toolset = buildTools(ctx, (ev) => { void emit(ev); }) as ReturnType<typeof buildTools> & { __fileEvents: Array<{ action: string; path: string; to?: string }> };
-          const { __fileEvents, ...tools } = toolset;
-
           const persistedHistory = await loadRecentMessages(ctx);
-          const modelMessages = Array.isArray(messages)
-            ? await convertToModelMessages(messages)
-            : buildConversationContext(persistedHistory);
 
-          const gw = await getGateway();
-          const CTRL_TOKEN_RE = /<ctrl\d+>/gi;
-          const runStream = async (extraSystem?: string) => {
-            const result = streamText({
-              model: gw.provider(gw.model(BUILD_MODEL)),
-              system: extraSystem ? `${SYSTEM_PROMPT}\n\n${extraSystem}` : SYSTEM_PROMPT,
-              messages: modelMessages,
-              tools,
-              stopWhen: stepCountIs(80),
-            });
-            for await (const delta of result.textStream) {
-              const clean = delta.replace(CTRL_TOKEN_RE, "");
-              assistantText += clean;
-              if (clean) await emit({ type: "text", delta: clean });
-              if (assistantMessageId && assistantText.length - lastPersistedLength >= 800) {
-                lastPersistedLength = assistantText.length;
-                await updateMessage(ctx, assistantMessageId, assistantText.trim() || "...", { change_events: __fileEvents, status: "streaming" });
+          // ── Primary path: Claude Code inside E2B ──────────────────────
+          const claudeState: ClaudeRunState = { text: "", fileEvents: [] };
+          const userPrompt = singleMessage || (persistedHistory.filter((m) => m.role === "user").slice(-1)[0]?.content ?? "");
+          const claudeOk = await tryClaudeCode(ctx, userPrompt, persistedHistory, emit, claudeState);
+
+          let __fileEvents: Array<{ action: string; path: string; to?: string }>;
+          if (claudeOk) {
+            assistantText = claudeState.text;
+            __fileEvents = claudeState.fileEvents;
+          } else {
+            // ── Fallback: legacy AI SDK + fs_* tools ─────────────────────
+            const toolset = buildTools(ctx, (ev) => { void emit(ev); }) as ReturnType<typeof buildTools> & { __fileEvents: Array<{ action: string; path: string; to?: string }> };
+            const { __fileEvents: legacyEvents, ...tools } = toolset;
+            __fileEvents = legacyEvents;
+            const modelMessages = Array.isArray(messages)
+              ? await convertToModelMessages(messages)
+              : buildConversationContext(persistedHistory);
+            const gw = await getGateway();
+            const CTRL_TOKEN_RE = /<ctrl\d+>/gi;
+            const runStream = async (extraSystem?: string) => {
+              const result = streamText({
+                model: gw.provider(gw.model(BUILD_MODEL)),
+                system: extraSystem ? `${SYSTEM_PROMPT}\n\n${extraSystem}` : SYSTEM_PROMPT,
+                messages: modelMessages,
+                tools,
+                stopWhen: stepCountIs(80),
+              });
+              for await (const delta of result.textStream) {
+                const clean = delta.replace(CTRL_TOKEN_RE, "");
+                assistantText += clean;
+                if (clean) await emit({ type: "text", delta: clean });
+                if (assistantMessageId && assistantText.length - lastPersistedLength >= 800) {
+                  lastPersistedLength = assistantText.length;
+                  await updateMessage(ctx, assistantMessageId, assistantText.trim() || "...", { change_events: __fileEvents, status: "streaming" });
+                }
               }
+              return await (result as { finishReason?: Promise<string> | string }).finishReason;
+            };
+            let finish = await runStream();
+            if (__fileEvents.length === 0) {
+              assistantText = "";
+              await emit({ type: "step", text: "retry: لم تُستدعَ أي أداة — إعادة بتعليمات أقوى" });
+              finish = await runStream(
+                "تنبيه إجباري: ردك السابق لم يستدعِ أي أداة. ابدأ فوراً بـ fs_read ثم fs_write للملفات المطلوبة. ممنوع كتابة أي نص قبل أول استدعاء أداة. نفّذ الآن.",
+              );
             }
-            return await (result as { finishReason?: Promise<string> | string }).finishReason;
-          };
-
-          let finish = await runStream();
-          if (__fileEvents.length === 0) {
-            assistantText = "";
-            await emit({ type: "step", text: "retry: لم تُستدعَ أي أداة — إعادة بتعليمات أقوى" });
-            finish = await runStream(
-              "تنبيه إجباري: ردك السابق لم يستدعِ أي أداة. ابدأ فوراً بـ fs_read ثم fs_write للملفات المطلوبة. ممنوع كتابة أي نص قبل أول استدعاء أداة. نفّذ الآن.",
-            );
+            if (finish === "length") await emit({ type: "warn", text: "الرد اقترب من الحد لكني حفظت ما تم تنفيذه." });
           }
-          if (finish === "length") await emit({ type: "warn", text: "الرد اقترب من الحد لكني حفظت ما تم تنفيذه." });
 
           const changeTags = buildChangeTags(__fileEvents);
           const hasOwnSummary = /ملخص ما حدث/.test(assistantText);
@@ -1343,46 +1493,53 @@ Deno.serve(async (req) => {
           if (singleMessage) await saveMessage(ctx, "user", singleMessage);
           assistantMessageId = await createMessage(ctx, "assistant", "...");
 
-          const toolset = buildTools(ctx, emit) as ReturnType<typeof buildTools> & { __fileEvents: Array<{ action: string; path: string; to?: string }> };
-          const { __fileEvents, ...tools } = toolset;
-
           const persistedHistory = await loadRecentMessages(ctx);
-          const modelMessages = Array.isArray(messages)
-            ? await convertToModelMessages(messages)
-            : buildConversationContext(persistedHistory);
 
-          const gw = await getGateway();
-          const CTRL_TOKEN_RE2 = /<ctrl\d+>/gi;
-          const runStream2 = async (extraSystem?: string) => {
-            const result = streamText({
-              model: gw.provider(gw.model(BUILD_MODEL)),
-              system: extraSystem ? `${SYSTEM_PROMPT}\n\n${extraSystem}` : SYSTEM_PROMPT,
-              messages: modelMessages,
-              tools,
-              stopWhen: stepCountIs(80),
-            });
-            for await (const delta of result.textStream) {
-              const clean = delta.replace(CTRL_TOKEN_RE2, "");
-              assistantText += clean;
-              if (clean) emit({ type: "text", delta: clean });
-              if (assistantMessageId && assistantText.length - lastPersistedLength >= 800) {
-                lastPersistedLength = assistantText.length;
-                await updateMessage(ctx, assistantMessageId, assistantText.trim() || "...", { change_events: __fileEvents, status: "streaming" });
+          const claudeState: ClaudeRunState = { text: "", fileEvents: [] };
+          const userPrompt = singleMessage || (persistedHistory.filter((m) => m.role === "user").slice(-1)[0]?.content ?? "");
+          const claudeOk = await tryClaudeCode(ctx, userPrompt, persistedHistory, (e) => { emit(e); }, claudeState);
+
+          let __fileEvents: Array<{ action: string; path: string; to?: string }>;
+          if (claudeOk) {
+            assistantText = claudeState.text;
+            __fileEvents = claudeState.fileEvents;
+          } else {
+            const toolset = buildTools(ctx, emit) as ReturnType<typeof buildTools> & { __fileEvents: Array<{ action: string; path: string; to?: string }> };
+            const { __fileEvents: legacyEvents, ...tools } = toolset;
+            __fileEvents = legacyEvents;
+            const modelMessages = Array.isArray(messages)
+              ? await convertToModelMessages(messages)
+              : buildConversationContext(persistedHistory);
+            const gw = await getGateway();
+            const CTRL_TOKEN_RE2 = /<ctrl\d+>/gi;
+            const runStream2 = async (extraSystem?: string) => {
+              const result = streamText({
+                model: gw.provider(gw.model(BUILD_MODEL)),
+                system: extraSystem ? `${SYSTEM_PROMPT}\n\n${extraSystem}` : SYSTEM_PROMPT,
+                messages: modelMessages,
+                tools,
+                stopWhen: stepCountIs(80),
+              });
+              for await (const delta of result.textStream) {
+                const clean = delta.replace(CTRL_TOKEN_RE2, "");
+                assistantText += clean;
+                if (clean) emit({ type: "text", delta: clean });
+                if (assistantMessageId && assistantText.length - lastPersistedLength >= 800) {
+                  lastPersistedLength = assistantText.length;
+                  await updateMessage(ctx, assistantMessageId, assistantText.trim() || "...", { change_events: __fileEvents, status: "streaming" });
+                }
               }
+              return await (result as { finishReason?: Promise<string> | string }).finishReason;
+            };
+            let finish = await runStream2();
+            if (__fileEvents.length === 0) {
+              assistantText = "";
+              emit({ type: "step", text: "retry: لم تُستدعَ أي أداة — إعادة بتعليمات أقوى" });
+              finish = await runStream2(
+                "تنبيه إجباري: ردك السابق لم يستدعِ أي أداة. ابدأ فوراً بـ fs_read ثم fs_write للملفات المطلوبة. ممنوع كتابة أي نص قبل أول استدعاء أداة. نفّذ الآن.",
+              );
             }
-            return await (result as { finishReason?: Promise<string> | string }).finishReason;
-          };
-
-          let finish = await runStream2();
-          if (__fileEvents.length === 0) {
-            assistantText = "";
-            emit({ type: "step", text: "retry: لم تُستدعَ أي أداة — إعادة بتعليمات أقوى" });
-            finish = await runStream2(
-              "تنبيه إجباري: ردك السابق لم يستدعِ أي أداة. ابدأ فوراً بـ fs_read ثم fs_write للملفات المطلوبة. ممنوع كتابة أي نص قبل أول استدعاء أداة. نفّذ الآن.",
-            );
-          }
-          if (finish === "length") {
-            emit({ type: "warn", text: "الرد اقترب من الحد لكني حفظت ما تم تنفيذه." });
+            if (finish === "length") emit({ type: "warn", text: "الرد اقترب من الحد لكني حفظت ما تم تنفيذه." });
           }
 
           const changeTags = buildChangeTags(__fileEvents);
