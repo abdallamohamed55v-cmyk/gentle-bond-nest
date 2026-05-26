@@ -19,11 +19,22 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { Sandbox } from "npm:@e2b/code-interpreter@1.2.0";
 import { createJob, runInBackground, JobWriter } from "../_shared/jobs.ts";
 import { getRouter, ROUTER_MODELS, lovableEquivalent } from "../_shared/llm-router.ts";
+import {
+  bootstrapClaude,
+  runClaudeStream,
+  listChangedFiles,
+  DEFAULT_CODING_MODEL,
+  SANDBOX_APP_DIR,
+  type ClaudeEvent,
+} from "../_shared/claude-code.ts";
 
-// Coding models: moonshotai/kimi-k2.6 via OpenRouter (key in api_keys.service='openrouter'|'agentrouter').
-// Falls back to Lovable Gateway equivalent if router key is missing.
+// Primary engine: Claude Code CLI inside the project's E2B sandbox, routed
+// through the free-claude-code proxy to Kimi K2 on OpenRouter.
+// Fallback (AI SDK + fs_* tools) is preserved for when the sandbox or the
+// OpenRouter key is unavailable.
 const BUILD_MODEL = ROUTER_MODELS.coding;
 const NAME_MODEL = ROUTER_MODELS.coding;
+const CLAUDE_PROXY_MODEL = DEFAULT_CODING_MODEL;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
