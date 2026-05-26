@@ -4040,11 +4040,16 @@ Ask me anything to get started!`;
 
         {/* Bottom input - floating with blur. On desktop empty state, lifted to center. */}
         <div
-          style={{ ['--sb-left' as any]: (sidebarCollapsed ? 56 : 260) + 'px' }}
-          className={`fixed left-0 md:left-[var(--sb-left)] right-0 z-30 px-2 md:px-6 pb-[calc(env(safe-area-inset-bottom)+0.65rem)] md:pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 md:pt-6 pointer-events-none transition-[left,top,bottom] duration-200 ease-out bg-transparent ${
+          style={{
+            ['--sb-left' as any]: (sidebarCollapsed ? 56 : 260) + 'px',
+            bottom: 'var(--kb-offset, 0px)',
+            transform: 'translateZ(0)',
+            willChange: 'transform',
+          }}
+          className={`fixed left-0 md:left-[var(--sb-left)] right-0 z-30 px-2 md:px-6 pb-[calc(env(safe-area-inset-bottom)+0.65rem)] md:pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 md:pt-6 pointer-events-none transition-[left,top] duration-200 ease-out bg-transparent ${
             messages.length === 0 && !loadingMessages
-              ? "bottom-0 md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:bg-transparent md:backdrop-blur-0 md:border-0"
-              : "bottom-0 md:bg-transparent md:backdrop-blur-0 md:border-0"
+              ? "md:bottom-auto md:top-1/2 md:-translate-y-1/2 md:bg-transparent md:backdrop-blur-0 md:border-0"
+              : "md:bg-transparent md:backdrop-blur-0 md:border-0"
           }`}
         >
             <div className="max-w-3xl mx-auto space-y-2 pointer-events-auto">
