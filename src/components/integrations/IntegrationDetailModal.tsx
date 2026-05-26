@@ -79,11 +79,19 @@ export default function IntegrationDetailModal({ integration, isConnected, isLoa
               <div className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center ${
                 isConnected ? "bg-primary/5 border-primary/20" : "bg-muted/30 border-border/30"
               }`}>
-                {iconUrl ? (
-                  <img src={iconUrl} alt="" className="w-8 h-8 dark:invert" />
-                ) : (
-                  <span className="text-2xl font-bold text-muted-foreground">{integration.name.charAt(0)}</span>
-                )}
+                <img
+                  src={iconUrl}
+                  alt=""
+                  className="w-8 h-8 dark:invert"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    el.style.display = "none";
+                    const fb = el.nextElementSibling as HTMLElement | null;
+                    if (fb) fb.style.display = "inline";
+                  }}
+                />
+                <span className="hidden text-2xl font-bold text-muted-foreground">{integration.name.charAt(0)}</span>
+
               </div>
               <div>
                 <h2 className="text-lg font-bold text-foreground">{integration.name}</h2>
