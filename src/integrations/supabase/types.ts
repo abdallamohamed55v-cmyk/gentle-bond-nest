@@ -1110,6 +1110,54 @@ export type Database = {
           },
         ]
       }
+      composio_auth_configs: {
+        Row: {
+          app_slug: string
+          auth_config_id: string
+          created_at: string
+        }
+        Insert: {
+          app_slug: string
+          auth_config_id: string
+          created_at?: string
+        }
+        Update: {
+          app_slug?: string
+          auth_config_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      composio_connections: {
+        Row: {
+          app_slug: string
+          connected_account_id: string
+          created_at: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          app_slug: string
+          connected_account_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          app_slug?: string
+          connected_account_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       contact_submissions: {
         Row: {
           ai_reply: string | null
