@@ -25,7 +25,7 @@ export const DodoPaymentsBadge = ({
       href="https://dodopayments.com"
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Payments secured by Dodo Payments"
+      aria-label="Dodo Payments"
       className={`inline-flex items-center gap-2.5 rounded-full transition-colors ${
         sm ? "px-3 py-1.5 text-[11px]" : "px-3.5 py-2 text-[12px]"
       } ${
