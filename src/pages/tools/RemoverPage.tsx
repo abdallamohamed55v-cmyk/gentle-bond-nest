@@ -206,6 +206,11 @@ const RemoverPage = () => {
   const handleGenerate = async () => {
     if (!sourceImage) { toast.error("Please upload an image"); return; }
     if (!hasMaskSelection()) { toast.error("Select the part you want to erase first"); return; }
+    if (!hasEnoughCredits(REMOVER_COST)) {
+      toast.error("Insufficient MC");
+      navigate("/pricing");
+      return;
+    }
     setIsGenerating(true);
     try {
       const maskDataUrl = getMaskDataUrl();
