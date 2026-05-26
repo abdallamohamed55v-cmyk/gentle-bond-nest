@@ -3519,7 +3519,7 @@ Ask me anything to get started!`;
         {/* Desktop header (mobile bits hidden via md:hidden / hidden md:flex inside) */}
         <div className="hidden md:flex absolute top-0 inset-x-0 z-20 items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 min-h-[56px] pt-2.5 pointer-events-none [&>*]:pointer-events-auto md:bg-transparent bg-background/80 backdrop-blur-xl backdrop-saturate-150 md:backdrop-blur-0 md:backdrop-saturate-100 border-b border-border/40 md:border-b-0">
           {/* Unlock Pro centered absolutely (mobile + desktop) */}
-          {!hasConversation && (
+          {!hasConversation && !["pro","business","elite"].includes((userPlan||"").toLowerCase()) && (
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               <UnlockProButton onClick={() => navigate("/pricing")} aria-label="Unlock Pro" text="Unlock Pro" />
             </div>
