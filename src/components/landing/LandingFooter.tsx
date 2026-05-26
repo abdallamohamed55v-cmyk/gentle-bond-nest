@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PaymentMethods } from "@/components/branding/PaymentMethods";
-import { DodoPaymentsBadge } from "@/components/branding/DodoPaymentsBadge";
+
 
 const footerLinks = {
   Create: [
@@ -194,7 +194,7 @@ const LandingFooter = () => {
             Secure Payments
           </p>
           <PaymentMethods variant="dark" />
-          <DodoPaymentsBadge variant="dark" />
+
         </motion.div>
 
         {/* Bottom bar */}
