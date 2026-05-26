@@ -3719,6 +3719,7 @@ export type Database = {
         Row: {
           created_at: string
           dev_url: string | null
+          hmr_upgraded_at: string | null
           last_error: string | null
           last_sync_at: string | null
           project_id: string
@@ -3729,6 +3730,7 @@ export type Database = {
         Insert: {
           created_at?: string
           dev_url?: string | null
+          hmr_upgraded_at?: string | null
           last_error?: string | null
           last_sync_at?: string | null
           project_id: string
@@ -3739,6 +3741,7 @@ export type Database = {
         Update: {
           created_at?: string
           dev_url?: string | null
+          hmr_upgraded_at?: string | null
           last_error?: string | null
           last_sync_at?: string | null
           project_id?: string
