@@ -24,6 +24,21 @@ window.addEventListener("unhandledrejection", (e) => __reportThrottled(e.reason,
 const savedBubble = localStorage.getItem("userBubbleColor");
 if (savedBubble) document.documentElement.style.setProperty("--user-bubble", savedBubble);
 
+// Keep `position: fixed` elements pinned to the visual viewport on mobile
+// (iOS Safari shifts fixed elements when the URL bar / keyboard show or hide).
+// Components can read `--kb-offset` to translate themselves above the keyboard.
+(() => {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const update = () => {
+    const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty("--kb-offset", `${offset}px`);
+  };
+  update();
+  vv.addEventListener("resize", update);
+  vv.addEventListener("scroll", update);
+})();
+
 createRoot(document.getElementById("root")!).render(
   <HelmetProvider>
     <App />
