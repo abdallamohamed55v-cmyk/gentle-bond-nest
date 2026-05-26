@@ -418,18 +418,45 @@ async function sandboxAction(
           { timeoutMs: 5 * 60 * 1000 },
         );
       }
-      // Patch vite.config.* to allow the e2b.app preview host
+      // Patch vite.config.* to allow the e2b.app preview host AND enable
+      // polling-based file watching + WSS HMR through the Cloudflare/E2B tunnel.
+      // Without usePolling, FS changes from Claude inside the sandbox can take
+      // minutes to be picked up by Vite. Without hmr.clientPort/protocol the
+      // browser WebSocket fails and Vite falls back to full-reload polling.
+      const previewHost = sb.getHost(VITE_PORT);
       const patchScript = `
 const fs = require('fs');
+const SERVER_BLOCK = \`server: {
+    host: '0.0.0.0',
+    port: ${VITE_PORT},
+    strictPort: true,
+    allowedHosts: true,
+    watch: { usePolling: true, interval: 100 },
+    hmr: { protocol: 'wss', host: ${JSON.stringify(previewHost)}, clientPort: 443 },
+  }, \`;
 for (const f of ['vite.config.ts','vite.config.js','vite.config.mts','vite.config.mjs']) {
   if (!fs.existsSync(f)) continue;
   let s = fs.readFileSync(f, 'utf8');
-  if (s.includes('allowedHosts')) break;
-  if (/server\\s*:\\s*\\{/.test(s)) {
-    s = s.replace(/server\\s*:\\s*\\{/, 'server: { allowedHosts: true, ');
-  } else if (/defineConfig\\(\\s*\\{/.test(s)) {
-    s = s.replace(/defineConfig\\(\\s*\\{/, 'defineConfig({ server: { allowedHosts: true }, ');
+  if (s.includes('__lovable_hmr_patched__')) break;
+  // Remove any existing server: { ... } block (simple brace-balance scan)
+  const idx = s.search(/server\\s*:\\s*\\{/);
+  if (idx !== -1) {
+    let i = s.indexOf('{', idx);
+    let depth = 1; let j = i + 1;
+    while (j < s.length && depth > 0) {
+      const ch = s[j];
+      if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+      j++;
+    }
+    // also drop trailing comma if any
+    let end = j;
+    while (end < s.length && /[\\s,]/.test(s[end])) end++;
+    s = s.slice(0, idx) + s.slice(end);
   }
+  // Inject our server block right after defineConfig({
+  s = s.replace(/defineConfig\\(\\s*\\{/, 'defineConfig({ ' + SERVER_BLOCK);
+  s = '// __lovable_hmr_patched__\\n' + s;
   fs.writeFileSync(f, s);
   break;
 }
@@ -438,6 +465,11 @@ for (const f of ['vite.config.ts','vite.config.js','vite.config.mts','vite.confi
       await sb.commands.run(
         `cd ${SANDBOX_DIR} && node _lovable_patch_vite.cjs || true`,
         { timeoutMs: 10 * 1000 },
+      );
+      // Also set CHOKIDAR env vars as a belt-and-braces fallback
+      await sb.commands.run(
+        `echo 'CHOKIDAR_USEPOLLING=true' >> ${SANDBOX_DIR}/.env && echo 'CHOKIDAR_INTERVAL=100' >> ${SANDBOX_DIR}/.env`,
+        { timeoutMs: 5 * 1000 },
       );
       await sb.commands.run(
         `cd ${SANDBOX_DIR} && nohup npm run dev -- --host 0.0.0.0 --port ${VITE_PORT} > /tmp/dev.log 2>&1 &`,
