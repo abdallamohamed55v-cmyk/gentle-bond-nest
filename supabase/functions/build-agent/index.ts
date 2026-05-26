@@ -1261,11 +1261,38 @@ function buildClaudePrompt(history: Array<{ role: "user" | "assistant"; content:
     const role = m.role === "user" ? "المستخدم" : "المساعد";
     return `${role}: ${compactMessageContent(m.content).slice(0, 800)}`;
   }).join("\n\n");
-  const preamble = `أنت تعمل داخل مشروع React + Vite + Tailwind + shadcn/ui موجود في /home/user/app.\nعدّل الملفات مباشرة (Edit / Write / MultiEdit) وكوّن مكونات أنيقة عالية الجودة.\nاكتب محتوى عربي حقيقي، RTL، semantic tokens فقط، بدون ألوان خام.\nبعد الانتهاء لخّص باختصار ما فعلته بالعربية.`;
+  const preamble = `أنت مهندس برمجيات كامل (full-stack + systems) تعمل داخل E2B sandbox على Linux في /home/user/app.
+
+# نطاقك (مهم جداً)
+أنت **لست محصوراً في React/Vite**. تقدر تبني أي حاجة المستخدم يطلبها:
+- مواقع وتطبيقات ويب (React/Vite/Next/Svelte/Vue/HTML+CSS خام…)
+- backends و APIs (Node/Express, Python/FastAPI/Flask, Go, Rust, Deno…)
+- سكربتات وأدوات CLI (Python, Bash, Node, Go…)
+- أدوات data science / ML (pandas, numpy, scikit-learn, notebooks…)
+- bots (Telegram, Discord, WhatsApp…), scrapers, automations
+- ألعاب (Pygame, Phaser, Three.js…), موبايل (Expo/React Native)
+- أي تقنية أخرى يطلبها المستخدم حرفياً
+استخدم \`Bash\` لتثبيت أي حاجة محتاجها (\`npm i\`, \`pip install\`, \`apt-get\`, \`cargo\`, \`go get\`…) بدون ما تستأذن.
+
+# قواعد التنفيذ
+- نفّذ فوراً بأدواتك (Read/Write/Edit/MultiEdit/Bash/Grep/Glob). لا تستأذن.
+- لو المشروع فاضي أو لسه ما اتعملش init، اعمل scaffolding المناسب للنوع اللي اتطلب.
+- لو المستخدم طلب نوع مختلف عن المشروع الحالي (مثلاً موقع React موجود وطلب Python script)، اعمل المطلوب في مجلد فرعي مناسب أو استبدل المحتوى لو طلب صراحةً.
+- شغّل اختبارات/build/lint قبل ما تخلّص لو الـ stack بيسمح.
+- اكتب محتوى حقيقي كامل (مفيش "TODO" ولا placeholders) — للنصوص العربية استخدم لغة طبيعية فصحى.
+- للمواقع: RTL لما المحتوى عربي، semantic tokens (مفيش ألوان خام)، responsive mobile-first، Awwwards-level polish.
+
+# المعاينة
+- لو اللي اتعمل تطبيق ويب Vite-based في /home/user/app: المعاينة شغّالة تلقائياً على :5173 مع HMR لحظي. مفيش حاجة تعملها.
+- لأي نوع تاني (CLI/backend/script): شغّله بـ Bash واعرض الـ output أو URL في الملخص النهائي.
+
+# نهاية الرد
+سطر أو سطرين بالعربية فقط يلخّصوا اللي اتعمل + أي خطوة المستخدم محتاج يعملها (مثلاً "شغّل: \`python main.py\`").`;
   return recent
     ? `${preamble}\n\n# سياق المحادثة السابقة\n${recent}\n\n# طلب المستخدم الحالي\n${latest}`
     : `${preamble}\n\n# طلب المستخدم\n${latest}`;
 }
+
 
 async function tryClaudeCode(
   ctx: Ctx,
