@@ -362,6 +362,78 @@ function packageContent(files: Array<{ path: string; content: string }>) {
   return files.find((f) => String(f.path).replace(/^\/+/, "") === "package.json")?.content ?? "";
 }
 
+// Patch vite.config.* for instant HMR through the E2B/Cloudflare tunnel and
+// (re)start the Vite dev server. Idempotent — guarded by a marker comment.
+async function applyHmrPatchAndRestartVite(sb: any): Promise<void> {
+  const previewHost = sb.getHost(VITE_PORT);
+  const patchScript = `
+const fs = require('fs');
+const SERVER_BLOCK = \`server: {
+    host: '0.0.0.0',
+    port: ${VITE_PORT},
+    strictPort: true,
+    allowedHosts: true,
+    watch: { usePolling: true, interval: 100 },
+    hmr: { protocol: 'wss', host: ${JSON.stringify(previewHost)}, clientPort: 443 },
+  }, \`;
+for (const f of ['vite.config.ts','vite.config.js','vite.config.mts','vite.config.mjs']) {
+  if (!fs.existsSync(f)) continue;
+  let s = fs.readFileSync(f, 'utf8');
+  if (s.includes('__lovable_hmr_patched__')) { process.exit(0); }
+  const idx = s.search(/server\\s*:\\s*\\{/);
+  if (idx !== -1) {
+    let i = s.indexOf('{', idx);
+    let depth = 1; let j = i + 1;
+    while (j < s.length && depth > 0) {
+      const ch = s[j];
+      if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+      j++;
+    }
+    let end = j;
+    while (end < s.length && /[\\s,]/.test(s[end])) end++;
+    s = s.slice(0, idx) + s.slice(end);
+  }
+  s = s.replace(/defineConfig\\(\\s*\\{/, 'defineConfig({ ' + SERVER_BLOCK);
+  s = '// __lovable_hmr_patched__\\n' + s;
+  fs.writeFileSync(f, s);
+  console.log('PATCHED');
+  process.exit(0);
+}
+`;
+  await sb.files.write(`${SANDBOX_DIR}/_lovable_patch_vite.cjs`, patchScript);
+  const patchRes = await sb.commands.run(
+    `cd ${SANDBOX_DIR} && node _lovable_patch_vite.cjs`,
+    { timeoutMs: 10 * 1000 },
+  );
+  const wasPatched = /PATCHED/.test(patchRes.stdout ?? "");
+  await sb.commands.run(
+    `grep -q CHOKIDAR_USEPOLLING ${SANDBOX_DIR}/.env 2>/dev/null || (echo 'CHOKIDAR_USEPOLLING=true' >> ${SANDBOX_DIR}/.env && echo 'CHOKIDAR_INTERVAL=100' >> ${SANDBOX_DIR}/.env)`,
+    { timeoutMs: 5 * 1000 },
+  );
+  // Kill any running vite if we just patched (so the new config is picked up),
+  // then ensure vite is running.
+  if (wasPatched) {
+    await sb.commands.run(`pkill -f 'vite' || true`, { timeoutMs: 5_000 });
+  }
+  // Start vite if it isn't already listening on the port
+  await sb.commands.run(
+    `cd ${SANDBOX_DIR} && (curl -fsS -o /dev/null http://127.0.0.1:${VITE_PORT}/ 2>/dev/null || nohup npm run dev -- --host 0.0.0.0 --port ${VITE_PORT} > /tmp/dev.log 2>&1 &)`,
+    { background: true, timeoutMs: 10 * 1000 },
+  );
+}
+
+// Fire-and-forget silent auto-upgrade for sandboxes started before the HMR
+// patch existed. Runs in the background so status responses stay fast.
+async function ensureHmrPatchInBackground(
+  sandboxId: string,
+): Promise<void> {
+  try {
+    const sb = await Sandbox.connect(sandboxId, { apiKey: E2B_API_KEY });
+    await applyHmrPatchAndRestartVite(sb);
+  } catch { /* silent — user shouldn't see it */ }
+}
+
 async function sandboxAction(
   svc: ReturnType<typeof createClient>,
   projectId: string,
@@ -378,6 +450,22 @@ async function sandboxAction(
 
   try {
     if (action === "status") {
+      // Silent auto-upgrade: if a sandbox is running but predates the HMR
+      // patch, apply it + restart vite in the background. User never sees it.
+      if (row?.sandbox_id && row.status === "running") {
+        const upgradedAt = (row as any).hmr_upgraded_at as string | null | undefined;
+        if (!upgradedAt) {
+          const sandboxId = row.sandbox_id as string;
+          // mark eagerly to avoid repeat attempts on every poll
+          await upsertSandboxRow(svc, projectId, { hmr_upgraded_at: new Date().toISOString() } as any).catch(() => {});
+          const p = ensureHmrPatchInBackground(sandboxId);
+          // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+          if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
+            // @ts-ignore
+            (EdgeRuntime as any).waitUntil(p);
+          }
+        }
+      }
       return { ok: true, data: row ?? { status: "stopped" } };
     }
     if (action === "stop") {
@@ -418,63 +506,9 @@ async function sandboxAction(
           { timeoutMs: 5 * 60 * 1000 },
         );
       }
-      // Patch vite.config.* to allow the e2b.app preview host AND enable
-      // polling-based file watching + WSS HMR through the Cloudflare/E2B tunnel.
-      // Without usePolling, FS changes from Claude inside the sandbox can take
-      // minutes to be picked up by Vite. Without hmr.clientPort/protocol the
-      // browser WebSocket fails and Vite falls back to full-reload polling.
-      const previewHost = sb.getHost(VITE_PORT);
-      const patchScript = `
-const fs = require('fs');
-const SERVER_BLOCK = \`server: {
-    host: '0.0.0.0',
-    port: ${VITE_PORT},
-    strictPort: true,
-    allowedHosts: true,
-    watch: { usePolling: true, interval: 100 },
-    hmr: { protocol: 'wss', host: ${JSON.stringify(previewHost)}, clientPort: 443 },
-  }, \`;
-for (const f of ['vite.config.ts','vite.config.js','vite.config.mts','vite.config.mjs']) {
-  if (!fs.existsSync(f)) continue;
-  let s = fs.readFileSync(f, 'utf8');
-  if (s.includes('__lovable_hmr_patched__')) break;
-  // Remove any existing server: { ... } block (simple brace-balance scan)
-  const idx = s.search(/server\\s*:\\s*\\{/);
-  if (idx !== -1) {
-    let i = s.indexOf('{', idx);
-    let depth = 1; let j = i + 1;
-    while (j < s.length && depth > 0) {
-      const ch = s[j];
-      if (ch === '{') depth++;
-      else if (ch === '}') depth--;
-      j++;
-    }
-    // also drop trailing comma if any
-    let end = j;
-    while (end < s.length && /[\\s,]/.test(s[end])) end++;
-    s = s.slice(0, idx) + s.slice(end);
-  }
-  // Inject our server block right after defineConfig({
-  s = s.replace(/defineConfig\\(\\s*\\{/, 'defineConfig({ ' + SERVER_BLOCK);
-  s = '// __lovable_hmr_patched__\\n' + s;
-  fs.writeFileSync(f, s);
-  break;
-}
-`;
-      await sb.files.write(`${SANDBOX_DIR}/_lovable_patch_vite.cjs`, patchScript);
-      await sb.commands.run(
-        `cd ${SANDBOX_DIR} && node _lovable_patch_vite.cjs || true`,
-        { timeoutMs: 10 * 1000 },
-      );
-      // Also set CHOKIDAR env vars as a belt-and-braces fallback
-      await sb.commands.run(
-        `echo 'CHOKIDAR_USEPOLLING=true' >> ${SANDBOX_DIR}/.env && echo 'CHOKIDAR_INTERVAL=100' >> ${SANDBOX_DIR}/.env`,
-        { timeoutMs: 5 * 1000 },
-      );
-      await sb.commands.run(
-        `cd ${SANDBOX_DIR} && nohup npm run dev -- --host 0.0.0.0 --port ${VITE_PORT} > /tmp/dev.log 2>&1 &`,
-        { background: true, timeoutMs: 10 * 1000 },
-      );
+      // Apply HMR patch + start vite (extracted helper; also reused for silent auto-upgrade)
+      await applyHmrPatchAndRestartVite(sb);
+
       const host = sb.getHost(VITE_PORT);
       const devUrl = `https://${host}`;
       await upsertSandboxRow(svc, projectId, {
