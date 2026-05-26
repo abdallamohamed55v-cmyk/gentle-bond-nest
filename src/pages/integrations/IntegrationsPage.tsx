@@ -44,16 +44,21 @@ const IntegrationsPage = () => {
 
   const loadConnections = async () => {
     try {
-      // Backend is the source of truth — no localStorage.
       const next: Record<string, string> = {};
-      const [githubStatus, supabaseStatus] = await Promise.all([
+      const [githubStatus, supabaseStatus, composioStatus] = await Promise.all([
         supabase.functions.invoke("github-push", { body: { action: "status" } }),
         supabase.functions.invoke("supabase-link-manager", { body: { action: "status" } }),
+        supabase.functions.invoke("composio", { body: { action: "status" } }),
       ]);
       if (!githubStatus.error && githubStatus.data?.connected) next.github = "linked";
-      else delete next.github;
       if (!supabaseStatus.error && supabaseStatus.data?.connected) next.supabase = "linked";
-      else delete next.supabase;
+      if (!composioStatus.error && Array.isArray(composioStatus.data?.connections)) {
+        for (const c of composioStatus.data.connections) {
+          if (c?.app_slug && (c.status === "active" || c.status === "initiated")) {
+            next[c.app_slug] = "linked";
+          }
+        }
+      }
       setConnectedApps(next);
     } catch {
       // ignore
@@ -67,55 +72,89 @@ const IntegrationsPage = () => {
   };
 
   const handleConnect = async (integration: Integration) => {
-    if (integration.app !== "github" && integration.app !== "supabase") {
-      toast.error(`${integration.name} is not available yet`);
-      return;
-    }
     setLoadingApp(integration.id);
     const popup = window.open("about:blank", `${integration.app}-oauth`, "width=600,height=750");
     try {
-      const statusFn = integration.app === "github" ? "github-push" : "supabase-link-manager";
-      const startFn = integration.app === "github" ? "oauth-github-connect" : "supabase-oauth-start";
-      const { data: status } = await supabase.functions.invoke(statusFn, { body: { action: "status" } });
-      if (status?.connected) {
-        if (popup && !popup.closed) popup.close();
-        persist({ ...connectedApps, [integration.app]: "linked" });
-        toast.success(`${integration.name} connected`);
-        setSelectedIntegration(null);
-        return;
-      }
-      const { data, error } = await supabase.functions.invoke(startFn, { body: { redirect_to: window.location.href } });
-      if (error || data?.error || !data?.authorize_url) throw new Error(data?.error || error?.message || "OAuth is not configured");
-      if (!popup) throw new Error("Allow popups to complete the connection");
-      popup.location.href = data.authorize_url;
-      const listener = (ev: MessageEvent) => {
-        if (ev.data?.type !== `${integration.app}-oauth`) return;
-        window.removeEventListener("message", listener);
-        window.clearInterval(poll);
-        if (ev.data?.ok === false) {
-          toast.error(ev.data?.message || `${integration.name} connection failed`);
-          setLoadingApp(null);
+      // Native OAuth flows for GitHub & Supabase keep working
+      if (integration.app === "github" || integration.app === "supabase") {
+        const statusFn = integration.app === "github" ? "github-push" : "supabase-link-manager";
+        const startFn = integration.app === "github" ? "oauth-github-connect" : "supabase-oauth-start";
+        const { data: status } = await supabase.functions.invoke(statusFn, { body: { action: "status" } });
+        if (status?.connected) {
+          if (popup && !popup.closed) popup.close();
+          persist({ ...connectedApps, [integration.app]: "linked" });
+          toast.success(`${integration.name} connected`);
+          setSelectedIntegration(null);
           return;
         }
-        persist({ ...connectedApps, [integration.app]: "linked" });
-        toast.success(`${integration.name} connected`);
-        setSelectedIntegration(null);
-        setLoadingApp(null);
-      };
-      window.addEventListener("message", listener);
+        const { data, error } = await supabase.functions.invoke(startFn, { body: { redirect_to: window.location.href } });
+        if (error || data?.error || !data?.authorize_url) throw new Error(data?.error || error?.message || "OAuth is not configured");
+        if (!popup) throw new Error("Allow popups to complete the connection");
+        popup.location.href = data.authorize_url;
+        const listener = (ev: MessageEvent) => {
+          if (ev.data?.type !== `${integration.app}-oauth`) return;
+          window.removeEventListener("message", listener);
+          window.clearInterval(poll);
+          if (ev.data?.ok === false) {
+            toast.error(ev.data?.message || `${integration.name} connection failed`);
+            setLoadingApp(null);
+            return;
+          }
+          persist({ ...connectedApps, [integration.app]: "linked" });
+          toast.success(`${integration.name} connected`);
+          setSelectedIntegration(null);
+          setLoadingApp(null);
+        };
+        window.addEventListener("message", listener);
+        const poll = window.setInterval(async () => {
+          if (!popup.closed) return;
+          window.clearInterval(poll);
+          window.removeEventListener("message", listener);
+          await loadConnections();
+          setLoadingApp(null);
+        }, 1200);
+        return;
+      }
+
+      // All other apps go through Composio (OAuth managed by Composio).
+      const { data, error } = await supabase.functions.invoke("composio", {
+        body: {
+          action: "connect",
+          app_slug: integration.app,
+          callback_url: window.location.href,
+        },
+      });
+      if (error || data?.error || !data?.redirect_url) {
+        throw new Error(data?.error || error?.message || `${integration.name} is not available on Composio yet`);
+      }
+      if (!popup) throw new Error("Allow popups to complete the connection");
+      popup.location.href = data.redirect_url;
+
       const poll = window.setInterval(async () => {
-        if (!popup.closed) return;
-        window.clearInterval(poll);
-        window.removeEventListener("message", listener);
-        await loadConnections();
-        setLoadingApp(null);
-      }, 1200);
+        // Poll Composio status until the popup closes OR the connection becomes active.
+        try {
+          const { data: s } = await supabase.functions.invoke("composio", { body: { action: "status" } });
+          const linked = (s?.connections || []).some((c: any) => c.app_slug === integration.app && c.status === "active");
+          if (linked) {
+            window.clearInterval(poll);
+            if (popup && !popup.closed) popup.close();
+            persist({ ...connectedApps, [integration.app]: "linked" });
+            toast.success(`${integration.name} connected`);
+            setSelectedIntegration(null);
+            setLoadingApp(null);
+            return;
+          }
+        } catch { /* ignore */ }
+        if (popup.closed) {
+          window.clearInterval(poll);
+          await loadConnections();
+          setLoadingApp(null);
+        }
+      }, 1500);
     } catch (err) {
       if (popup && !popup.closed) popup.close();
       toast.error(err instanceof Error ? err.message : `${integration.name} connection failed`);
       setLoadingApp(null);
-    } finally {
-      if (!integration.app.includes("github") && !integration.app.includes("supabase")) setLoadingApp(null);
     }
   };
 
@@ -124,9 +163,12 @@ const IntegrationsPage = () => {
     try {
       if (integration.app === "github") {
         await supabase.functions.invoke("github-push", { body: { action: "disconnect" } });
-      }
-      if (integration.app === "supabase") {
+      } else if (integration.app === "supabase") {
         await supabase.functions.invoke("supabase-link-manager", { body: { action: "disconnect" } });
+      } else {
+        await supabase.functions.invoke("composio", {
+          body: { action: "disconnect", app_slug: integration.app },
+        });
       }
       const next = { ...connectedApps };
       delete next[integration.app];
