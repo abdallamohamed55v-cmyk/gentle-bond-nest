@@ -302,6 +302,8 @@ const SLIDES_TIMEOUT_MESSAGE = "Slides generation took too long and was stopped 
 
 const ChatPage = () => {
   const navigate = useNavigate();
+  const { plan: userPlan } = useUserPlan();
+  const isPaidPlan = ["pro", "business", "elite"].includes((userPlan || "").toLowerCase());
   const location = useLocation();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
