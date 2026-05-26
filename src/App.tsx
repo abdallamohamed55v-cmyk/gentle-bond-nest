@@ -11,6 +11,13 @@ import CookieConsent from "./components/common/CookieConsent";
 import TranslationWrapper from "./components/common/TranslationWrapper";
 import MegsyPrRedirect from "./components/megsy-pr/MegsyPrRedirect";
 
+// Redirect legacy /tools/<slug> to /images/tools/<slug>
+const LegacyToolsRedirect = () => {
+  const location = useLocation();
+  const rest = location.pathname.replace(/^\/tools/, "");
+  return <Navigate to={`/images/tools${rest}`} replace />;
+};
+
 // Critical pages — eagerly loaded (landing only; everything else is lazy)
 import LandingPage from "./pages/marketing/LandingPage";
 
@@ -407,6 +414,11 @@ const App = () => {
                   <Route path="/images/tools/product-photo" element={<ProtectedRoute><ProductPhotoPage /></ProtectedRoute>} />
                   <Route path="/images/tools/logo-generator" element={<ProtectedRoute><LogoGeneratorPage /></ProtectedRoute>} />
                   <Route path="/images/tools/perspective-correction" element={<ProtectedRoute><PerspectiveCorrectionPage /></ProtectedRoute>} />
+                  {/* Legacy redirects: /tools/* -> /images/tools/* */}
+                  <Route path="/tools/*" element={<LegacyToolsRedirect />} />
+
+
+
 
                   {/* Videos */}
                   <Route path="/videos" element={<ProtectedRoute><MediaHubPage key={currentUserId} /></ProtectedRoute>} />
