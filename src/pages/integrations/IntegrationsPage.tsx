@@ -12,25 +12,56 @@ import IntegrationDetailModal from "@/components/integrations/IntegrationDetailM
 
 const ICON_BASE = "https://cdn.jsdelivr.net/npm/simple-icons@v13/icons";
 
-const ICON_MAP: Record<string, string> = {
-  gmail: "gmail", outlook: "microsoftoutlook", slack: "slack", discord: "discord",
-  microsoftteams: "microsoftteams", zoom: "zoom", telegram: "telegram",
-  whatsapp: "whatsapp", notion: "notion", googlecalendar: "googlecalendar",
-  todoist: "todoist", trello: "trello", asana: "asana", clickup: "clickup",
-  github: "github", gitlab: "gitlab", jira: "jira", linear: "linear",
-  vercel: "vercel", salesforce: "salesforce", hubspot: "hubspot",
-  stripe: "stripe", paypal: "paypal", shopify: "shopify",
-  instagram: "instagram", twitter: "x", facebook: "facebook", linkedin: "linkedin",
-  youtube: "youtube", pinterest: "pinterest", reddit: "reddit",
-  googledrive: "googledrive", dropbox: "dropbox", figma: "figma", canva: "canva",
-  zendesk: "zendesk", wordpress: "wordpress",
-  firebase: "firebase", supabase: "supabase", airtable: "airtable",
-  openai: "openai", googlesheets: "googlesheets",
+// Maps app slug -> simple-icons slug. Only entries that differ from the app id need overrides.
+const ICON_OVERRIDES: Record<string, string> = {
+  outlook: "microsoftoutlook",
+  outlookcalendar: "microsoftoutlook",
+  twitter: "x",
+  microsoftteams: "microsoftteams",
+  microsoftword: "microsoftword",
+  microsoftexcel: "microsoftexcel",
+  onenote: "microsoftonenote",
+  onedrive: "microsoftonedrive",
+  sharepoint: "microsoftsharepoint",
+  azure: "microsoftazure",
+  gcp: "googlecloud",
+  s3: "amazons3",
+  aws: "amazonwebservices",
+  amazon: "amazon",
+  monday: "mondaydotcom",
+  zohocrm: "zoho",
+  facebookads: "meta",
+  googleads: "googleads",
+  linkedinads: "linkedin",
+  tiktokads: "tiktok",
+  linkedinrecruiter: "linkedin",
+  tawk: "tawkdotto",
+  front: "frontendmentor",
+  adobexd: "adobexd",
+  woocommerce: "woocommerce",
+  bigcommerce: "bigcommerce",
+  googleanalytics: "googleanalytics",
+  googlemeet: "googlemeet",
+  googlecalendar: "googlecalendar",
+  googledrive: "googledrive",
+  googledocs: "googledocs",
+  googlesheets: "googlesheets",
+  googleforms: "googleforms",
+  googleslides: "googleslides",
+  huggingface: "huggingface",
+  midjourney: "midjourney",
+  perplexity: "perplexity",
+  anthropic: "anthropic",
+  threads: "threads",
+  squarespace: "squarespace",
+  framer: "framer",
 };
 
-function getIcon(app: string): string | null {
-  return ICON_MAP[app] ? `${ICON_BASE}/${ICON_MAP[app]}.svg` : null;
+function getIcon(app: string): string {
+  const slug = ICON_OVERRIDES[app] || app.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return `${ICON_BASE}/${slug}.svg`;
 }
+
 
 const IntegrationsPage = () => {
   const navigate = useNavigate();
