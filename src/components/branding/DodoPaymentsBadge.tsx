@@ -25,7 +25,7 @@ export const DodoPaymentsBadge = ({
       href="https://dodopayments.com"
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Payments secured by Dodo Payments"
+      aria-label="Dodo Payments"
       className={`inline-flex items-center gap-2.5 rounded-full transition-colors ${
         sm ? "px-3 py-1.5 text-[11px]" : "px-3.5 py-2 text-[12px]"
       } ${
@@ -34,13 +34,6 @@ export const DodoPaymentsBadge = ({
           : "bg-white ring-1 ring-black/[0.06] text-foreground/70 hover:text-foreground shadow-sm hover:shadow"
       } ${className}`}
     >
-      <span className={`flex items-center gap-1.5 font-medium ${dark ? "text-white/55" : "text-muted-foreground"}`}>
-        <svg viewBox="0 0 24 24" width={sm ? 11 : 12} height={sm ? 11 : 12} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <rect x="3" y="6" width="18" height="13" rx="2.5" />
-          <path d="M3 10h18" />
-        </svg>
-        <span>Payments secured by</span>
-      </span>
       <img
         src={dark ? dodoDark : dodoLight}
         alt="Dodo Payments"
