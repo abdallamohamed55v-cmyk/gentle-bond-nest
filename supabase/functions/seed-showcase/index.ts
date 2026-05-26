@@ -22,6 +22,9 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  // Mark a curated subset as trending so the Trending section is populated
+  const trendingSet = new Set([1, 5, 11, 14, 16, 19, 20, 24, 31, 33]);
+
   const rows = (prompts as Array<{ num: number; title: string; prompt: string }>).map((p) => ({
     media_url: `/templates/showcase/${p.num}.jpg`,
     media_type: "image",
@@ -32,6 +35,8 @@ Deno.serve(async (req) => {
     quality: "standard",
     display_order: p.num,
     category: catMap[p.num] ?? "Photography",
+    is_trending: trendingSet.has(p.num),
+    trending_at: trendingSet.has(p.num) ? new Date().toISOString() : null,
   }));
 
   // Remove any prior rows that share these template URLs (idempotent)
