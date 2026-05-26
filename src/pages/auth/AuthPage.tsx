@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { invokeFunction } from "@/lib/supabaseFunction";
 import { toast } from "sonner";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 type Step = "email" | "password" | "otp-signup" | "set-password" | "otp-2fa" | "forgot-password" | "otp-reset" | "reset-password";
 type ClipboardField = { name: "email" | "password" | "newPassword" | "otp"; otpIndex?: number };
@@ -485,26 +486,34 @@ const AuthPage = () => {
 
             {isOtpStep && (
               <motion.div key={`otp-${step}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.18 }} className="space-y-5">
-                <div className="flex justify-between gap-2">
-                  {otpValues.map((val, i) => (
-                    <input
-                      key={`otp-${step}-${i}`}
-                      ref={(el) => { inputRefs.current[i] = el; }}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      autoComplete="one-time-code"
-                      maxLength={1}
-                      value={val}
-                      onChange={(e) => handleOtpChange(i, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                      onPaste={(e) => handleOtpPaste(e, i)}
-                      {...clipboardProps({ name: "otp", otpIndex: i })}
-                      onFocus={(e) => e.target.select()}
-                      className="w-full aspect-square max-w-[52px] text-center text-2xl font-display font-bold text-foreground bg-transparent border-0 border-b-2 border-white/15 outline-none focus:border-foreground/70 transition-colors duration-200"
-                    />
-                  ))}
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={otpValues.join("")}
+                    onChange={(val) => {
+                      const digits = val.replace(/\D/g, "").slice(0, 6);
+                      const next = ["", "", "", "", "", ""];
+                      digits.split("").forEach((d, i) => { next[i] = d; });
+                      setOtpValues(next);
+                      if (digits.length === 6) handleVerifyOTP(digits);
+                    }}
+                    autoFocus
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="one-time-code"
+                  >
+                    <InputOTPGroup className="gap-2">
+                      {[0, 1, 2, 3, 4, 5].map((i) => (
+                        <InputOTPSlot
+                          key={`otp-${step}-${i}`}
+                          index={i}
+                          className="w-11 h-12 sm:w-12 sm:h-14 text-2xl font-display font-bold text-foreground bg-transparent border-0 border-b-2 border-white/15 rounded-none first:rounded-none last:rounded-none focus-within:border-foreground/70 transition-colors"
+                        />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
                 </div>
+
                 {isSubmitting && (
                   <p className="text-[12px] text-foreground/55 text-center flex items-center justify-center gap-2">
                     <Spinner /> Verifying…
