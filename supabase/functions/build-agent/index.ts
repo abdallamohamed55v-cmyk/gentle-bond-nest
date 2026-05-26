@@ -1493,46 +1493,53 @@ Deno.serve(async (req) => {
           if (singleMessage) await saveMessage(ctx, "user", singleMessage);
           assistantMessageId = await createMessage(ctx, "assistant", "...");
 
-          const toolset = buildTools(ctx, emit) as ReturnType<typeof buildTools> & { __fileEvents: Array<{ action: string; path: string; to?: string }> };
-          const { __fileEvents, ...tools } = toolset;
-
           const persistedHistory = await loadRecentMessages(ctx);
-          const modelMessages = Array.isArray(messages)
-            ? await convertToModelMessages(messages)
-            : buildConversationContext(persistedHistory);
 
-          const gw = await getGateway();
-          const CTRL_TOKEN_RE2 = /<ctrl\d+>/gi;
-          const runStream2 = async (extraSystem?: string) => {
-            const result = streamText({
-              model: gw.provider(gw.model(BUILD_MODEL)),
-              system: extraSystem ? `${SYSTEM_PROMPT}\n\n${extraSystem}` : SYSTEM_PROMPT,
-              messages: modelMessages,
-              tools,
-              stopWhen: stepCountIs(80),
-            });
-            for await (const delta of result.textStream) {
-              const clean = delta.replace(CTRL_TOKEN_RE2, "");
-              assistantText += clean;
-              if (clean) emit({ type: "text", delta: clean });
-              if (assistantMessageId && assistantText.length - lastPersistedLength >= 800) {
-                lastPersistedLength = assistantText.length;
-                await updateMessage(ctx, assistantMessageId, assistantText.trim() || "...", { change_events: __fileEvents, status: "streaming" });
+          const claudeState: ClaudeRunState = { text: "", fileEvents: [] };
+          const userPrompt = singleMessage || (persistedHistory.filter((m) => m.role === "user").slice(-1)[0]?.content ?? "");
+          const claudeOk = await tryClaudeCode(ctx, userPrompt, persistedHistory, (e) => { emit(e); }, claudeState);
+
+          let __fileEvents: Array<{ action: string; path: string; to?: string }>;
+          if (claudeOk) {
+            assistantText = claudeState.text;
+            __fileEvents = claudeState.fileEvents;
+          } else {
+            const toolset = buildTools(ctx, emit) as ReturnType<typeof buildTools> & { __fileEvents: Array<{ action: string; path: string; to?: string }> };
+            const { __fileEvents: legacyEvents, ...tools } = toolset;
+            __fileEvents = legacyEvents;
+            const modelMessages = Array.isArray(messages)
+              ? await convertToModelMessages(messages)
+              : buildConversationContext(persistedHistory);
+            const gw = await getGateway();
+            const CTRL_TOKEN_RE2 = /<ctrl\d+>/gi;
+            const runStream2 = async (extraSystem?: string) => {
+              const result = streamText({
+                model: gw.provider(gw.model(BUILD_MODEL)),
+                system: extraSystem ? `${SYSTEM_PROMPT}\n\n${extraSystem}` : SYSTEM_PROMPT,
+                messages: modelMessages,
+                tools,
+                stopWhen: stepCountIs(80),
+              });
+              for await (const delta of result.textStream) {
+                const clean = delta.replace(CTRL_TOKEN_RE2, "");
+                assistantText += clean;
+                if (clean) emit({ type: "text", delta: clean });
+                if (assistantMessageId && assistantText.length - lastPersistedLength >= 800) {
+                  lastPersistedLength = assistantText.length;
+                  await updateMessage(ctx, assistantMessageId, assistantText.trim() || "...", { change_events: __fileEvents, status: "streaming" });
+                }
               }
+              return await (result as { finishReason?: Promise<string> | string }).finishReason;
+            };
+            let finish = await runStream2();
+            if (__fileEvents.length === 0) {
+              assistantText = "";
+              emit({ type: "step", text: "retry: لم تُستدعَ أي أداة — إعادة بتعليمات أقوى" });
+              finish = await runStream2(
+                "تنبيه إجباري: ردك السابق لم يستدعِ أي أداة. ابدأ فوراً بـ fs_read ثم fs_write للملفات المطلوبة. ممنوع كتابة أي نص قبل أول استدعاء أداة. نفّذ الآن.",
+              );
             }
-            return await (result as { finishReason?: Promise<string> | string }).finishReason;
-          };
-
-          let finish = await runStream2();
-          if (__fileEvents.length === 0) {
-            assistantText = "";
-            emit({ type: "step", text: "retry: لم تُستدعَ أي أداة — إعادة بتعليمات أقوى" });
-            finish = await runStream2(
-              "تنبيه إجباري: ردك السابق لم يستدعِ أي أداة. ابدأ فوراً بـ fs_read ثم fs_write للملفات المطلوبة. ممنوع كتابة أي نص قبل أول استدعاء أداة. نفّذ الآن.",
-            );
-          }
-          if (finish === "length") {
-            emit({ type: "warn", text: "الرد اقترب من الحد لكني حفظت ما تم تنفيذه." });
+            if (finish === "length") emit({ type: "warn", text: "الرد اقترب من الحد لكني حفظت ما تم تنفيذه." });
           }
 
           const changeTags = buildChangeTags(__fileEvents);
