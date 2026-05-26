@@ -11,18 +11,23 @@ export interface Integration {
 
 export const INTEGRATION_CATEGORIES = [
   "All",
+  "Communication",
+  "Productivity",
   "Development",
+  "Marketing & Sales",
+  "Storage & Files",
+  "Design",
+  "Support",
+  "Finance",
+  "Social",
+  "Analytics",
+  "Other",
 ] as const;
 
-// Curated integrations — GitHub + Supabase only
+// Full integrations catalog — connected via Composio (https://composio.dev)
 export const integrations: Integration[] = [
-  { id: "github", name: "GitHub", description: "Code hosting and collaboration", category: "Development", app: "github" },
-  { id: "supabase", name: "Supabase", description: "Backend as a service", category: "Development", app: "supabase" },
-];
-
-// Legacy entries kept below are intentionally unused — file truncated above.
-const _legacyUnused: Integration[] = [
   // Communication
+
   { id: "gmail", name: "Gmail", description: "Send, read and manage emails", category: "Communication", app: "gmail" },
   { id: "outlook", name: "Outlook", description: "Microsoft email and calendar", category: "Communication", app: "outlook" },
   { id: "slack", name: "Slack", description: "Team messaging and channels", category: "Communication", app: "slack" },
