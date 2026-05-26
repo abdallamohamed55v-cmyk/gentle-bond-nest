@@ -4559,10 +4559,12 @@ export type Database = {
       showcase_items: {
         Row: {
           aspect_ratio: string
+          category: string | null
           created_at: string
           display_order: number
           duration: string | null
           id: string
+          is_trending: boolean
           media_type: string
           media_url: string
           model_id: string
@@ -4570,13 +4572,17 @@ export type Database = {
           prompt: string
           quality: string
           style: string | null
+          thumbnail_url: string | null
+          trending_at: string | null
         }
         Insert: {
           aspect_ratio?: string
+          category?: string | null
           created_at?: string
           display_order?: number
           duration?: string | null
           id?: string
+          is_trending?: boolean
           media_type?: string
           media_url: string
           model_id?: string
@@ -4584,13 +4590,17 @@ export type Database = {
           prompt?: string
           quality?: string
           style?: string | null
+          thumbnail_url?: string | null
+          trending_at?: string | null
         }
         Update: {
           aspect_ratio?: string
+          category?: string | null
           created_at?: string
           display_order?: number
           duration?: string | null
           id?: string
+          is_trending?: boolean
           media_type?: string
           media_url?: string
           model_id?: string
@@ -4598,6 +4608,8 @@ export type Database = {
           prompt?: string
           quality?: string
           style?: string | null
+          thumbnail_url?: string | null
+          trending_at?: string | null
         }
         Relationships: []
       }
