@@ -7,6 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import inpaintHero from "@/assets/inpaint-hero.webp";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useCredits } from "@/hooks/useCredits";
+
+const INPAINT_COST = 1;
 
 type Stage = "landing" | "edit" | "result";
 type Tool = "brush" | "eraser";
