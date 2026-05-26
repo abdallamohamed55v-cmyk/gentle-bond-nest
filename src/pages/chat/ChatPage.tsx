@@ -3350,7 +3350,8 @@ Ask me anything to get started!`;
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     transition={iosSpring}
-                    onClick={() => { setPlusMenuOpen(false); setConnectorsOpen(true); }}
+                    onClick={() => { setPlusMenuOpen(false); navigate("/settings/integrations"); }}
+
                     className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-[12.5px] font-semibold hover:bg-primary/90 transition-opacity"
                   >
                     <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
