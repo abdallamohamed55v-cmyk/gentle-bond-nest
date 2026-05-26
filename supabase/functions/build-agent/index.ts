@@ -554,6 +554,17 @@ for (const f of ['vite.config.ts','vite.config.js','vite.config.mts','vite.confi
       const out = await sb.commands.run(`mkdir -p $(dirname ${JSON.stringify(abs)}) && curl -sSL ${JSON.stringify(url)} -o ${JSON.stringify(abs)} && wc -c < ${JSON.stringify(abs)}`, { timeoutMs: 120000 });
       return { ok: true, data: { path: abs, bytes: (out.stdout ?? "").trim(), exitCode: out.exitCode ?? 0 } };
     }
+    if (action === "bootstrap_claude") {
+      if (!row?.sandbox_id) return { ok: false, error: "no_running_sandbox" };
+      const router = await getRouter();
+      if (!router?.key) return { ok: false, error: "openrouter_key_missing" };
+      const sb = await Sandbox.connect(row.sandbox_id, { apiKey: E2B_API_KEY });
+      await sb.setTimeout(SANDBOX_TIMEOUT_MS);
+      const res = await bootstrapClaude(sb, router.key, CLAUDE_PROXY_MODEL);
+      return res.ok
+        ? { ok: true, data: { ready: true, log: res.log } }
+        : { ok: false, error: `bootstrap_failed: ${res.log}` };
+    }
     return { ok: false, error: `unknown sandbox action: ${action}` };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
