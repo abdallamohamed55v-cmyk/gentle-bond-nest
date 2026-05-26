@@ -168,24 +168,25 @@ const PricingPreview = () => {
                 </div>
               )}
               <div
-                className={`relative h-full rounded-2xl border bg-[#0a0a0a] p-8 transition-all duration-300 hover:border-white/20 ${
+                className={`relative h-full rounded-2xl border bg-[#0a0a0a] p-5 sm:p-8 transition-all duration-300 hover:border-white/20 ${
                   plan.bestOffer ? "border-emerald-500/40" : "border-white/[0.08]"
                 }`}
               >
                 {/* Plan name */}
                 <h3
-                  className={`text-center font-display text-4xl font-black uppercase tracking-tight bg-gradient-to-b ${plan.nameClass} bg-clip-text text-transparent`}
+                  className={`text-center font-display text-3xl sm:text-4xl font-black uppercase tracking-tight break-words bg-gradient-to-b ${plan.nameClass} bg-clip-text text-transparent`}
                 >
                   {plan.name}
                 </h3>
 
                 {/* Price */}
-                <div className="mt-8 flex items-baseline justify-center gap-1">
-                  <span className="text-5xl font-bold text-white">${plan.price}</span>
-                  <span className="text-base text-white/50">/month</span>
+                <div className="mt-6 sm:mt-8 flex items-baseline justify-center gap-1">
+                  <span className="text-4xl sm:text-5xl font-bold text-white">${plan.price}</span>
+                  <span className="text-sm sm:text-base text-white/50">/month</span>
                 </div>
                 <p className="mt-2 text-center text-xs text-white/30">ex. tax</p>
                 <p className="mt-1 text-center text-[11px] text-white/35">{plan.yearlyNote}</p>
+
 
                 {Number(plan.price) >= 29 && (
                   <div className="mt-4">
