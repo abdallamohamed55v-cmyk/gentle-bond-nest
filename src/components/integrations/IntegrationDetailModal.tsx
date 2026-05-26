@@ -4,29 +4,21 @@ import type { Integration } from "@/lib/integrationsData";
 
 const ICON_BASE = "https://cdn.jsdelivr.net/npm/simple-icons@v13/icons";
 
-const iconMap: Record<string, string> = {
-  gmail: "gmail", outlook: "microsoftoutlook", slack: "slack", discord: "discord",
-  microsoftteams: "microsoftteams", zoom: "zoom", telegram: "telegram",
-  whatsapp: "whatsapp", notion: "notion", googlecalendar: "googlecalendar",
-  todoist: "todoist", trello: "trello", asana: "asana", clickup: "clickup",
-  github: "github", gitlab: "gitlab", jira: "jira", linear: "linear",
-  vercel: "vercel", salesforce: "salesforce", hubspot: "hubspot",
-  stripe: "stripe", paypal: "paypal", shopify: "shopify",
-  instagram: "instagram", twitter: "x", facebook: "facebook", linkedin: "linkedin",
-  youtube: "youtube", pinterest: "pinterest", reddit: "reddit",
-  googledrive: "googledrive", dropbox: "dropbox", figma: "figma", canva: "canva",
-  zendesk: "zendesk", wordpress: "wordpress", aws: "amazonwebservices",
-  firebase: "firebase", supabase: "supabase", airtable: "airtable",
-  zapier: "zapier", openai: "openai", twitch: "twitch", spotify: "spotify",
-  googlesheets: "googlesheets", calendly: "calendly", typeform: "typeform",
-  miro: "miro", sentry: "sentry", datadog: "datadog",
-  algolia: "algolia", cloudflare: "cloudflare",
-  mongodb: "mongodb", postgresql: "postgresql", mysql: "mysql", redis: "redis",
+const ICON_OVERRIDES: Record<string, string> = {
+  outlook: "microsoftoutlook", outlookcalendar: "microsoftoutlook",
+  twitter: "x", onenote: "microsoftonenote", onedrive: "microsoftonedrive",
+  sharepoint: "microsoftsharepoint", azure: "microsoftazure",
+  gcp: "googlecloud", s3: "amazons3", aws: "amazonwebservices",
+  monday: "mondaydotcom", zohocrm: "zoho", facebookads: "meta",
+  linkedinads: "linkedin", tiktokads: "tiktok", linkedinrecruiter: "linkedin",
+  tawk: "tawkdotto",
 };
 
-function getIcon(app: string): string | null {
-  return iconMap[app] ? `${ICON_BASE}/${iconMap[app]}.svg` : null;
+function getIcon(app: string): string {
+  const slug = ICON_OVERRIDES[app] || app.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return `${ICON_BASE}/${slug}.svg`;
 }
+
 
 const descriptions: Record<string, string> = {
   gmail: "Connect your Gmail account to send, read, and manage emails directly from the chat. You can compose emails, search your inbox, and set up automated email workflows — all through natural conversation.",
@@ -87,11 +79,19 @@ export default function IntegrationDetailModal({ integration, isConnected, isLoa
               <div className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center ${
                 isConnected ? "bg-primary/5 border-primary/20" : "bg-muted/30 border-border/30"
               }`}>
-                {iconUrl ? (
-                  <img src={iconUrl} alt="" className="w-8 h-8 dark:invert" />
-                ) : (
-                  <span className="text-2xl font-bold text-muted-foreground">{integration.name.charAt(0)}</span>
-                )}
+                <img
+                  src={iconUrl}
+                  alt=""
+                  className="w-8 h-8 dark:invert"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    el.style.display = "none";
+                    const fb = el.nextElementSibling as HTMLElement | null;
+                    if (fb) fb.style.display = "inline";
+                  }}
+                />
+                <span className="hidden text-2xl font-bold text-muted-foreground">{integration.name.charAt(0)}</span>
+
               </div>
               <div>
                 <h2 className="text-lg font-bold text-foreground">{integration.name}</h2>
