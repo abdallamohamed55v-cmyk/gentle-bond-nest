@@ -44,7 +44,7 @@ class WebContainerPreviewManager {
     if (this.instance) return this.instance;
     if (this.bootPromise) return this.bootPromise;
     this.emit({ stage: "booting" });
-    this.bootPromise = WebContainer.boot({ coep: "require-corp" }).then((wc) => {
+    this.bootPromise = WebContainer.boot({ coep: "credentialless" }).then((wc) => {
       this.instance = wc;
       wc.on("server-ready", (_port, url) => {
         this.emit({ stage: "ready", url });

@@ -10,10 +10,13 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
-    // Required for WebContainers (SharedArrayBuffer)
+    // Required for WebContainers (SharedArrayBuffer).
+    // 'credentialless' is more permissive than 'require-corp' — it allows
+    // cross-origin images/fonts/scripts (CDNs) without CORP headers,
+    // which would otherwise break the rest of the app.
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",
-      "Cross-Origin-Embedder-Policy": "require-corp",
+      "Cross-Origin-Embedder-Policy": "credentialless",
     },
   },
   plugins: [
