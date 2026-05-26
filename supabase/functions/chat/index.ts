@@ -1487,7 +1487,7 @@ UNIVERSAL LANGUAGE & DIALECT RULE (HIGHEST PRIORITY — APPLIES TO EVERY MODE: c
             heartbeat = setInterval(() => {
               try { controller.enqueue(encoder.encode(`: keep-alive ${Date.now()}\n\n`)); } catch { /* stream closed */ }
             }, 12000);
-            await handleToolCalls(controller, encoder, forcedToolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY);
+            await handleToolCalls(controller, encoder, forcedToolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY, user_id);
           } catch (e) {
             console.error("forced tool flow error:", e);
             const isAr = /[\u0600-\u06FF]/.test(latestUserText);
@@ -1625,7 +1625,7 @@ UNIVERSAL LANGUAGE & DIALECT RULE (HIGHEST PRIORITY — APPLIES TO EVERY MODE: c
             if (data === "[DONE]") {
               if (toolCalls.length > 0) {
                 try {
-                  await handleToolCalls(controller, encoder, toolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY);
+                  await handleToolCalls(controller, encoder, toolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY, user_id);
                 } catch (e) {
                   console.error("tool flow error:", e);
                   if (isDeepResearch) {
@@ -1681,7 +1681,7 @@ UNIVERSAL LANGUAGE & DIALECT RULE (HIGHEST PRIORITY — APPLIES TO EVERY MODE: c
 
         if (toolCalls.length > 0) {
           try {
-            await handleToolCalls(controller, encoder, toolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY);
+            await handleToolCalls(controller, encoder, toolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY, user_id);
           } catch (e) {
             console.error("tool flow error:", e);
             if (isDeepResearch) {
@@ -2015,6 +2015,7 @@ async function handleToolCalls(
   sb: any,
   depth: number = 0,
   HB_API_KEY: string | null = null,
+  composioUserId: string | null = null,
 ) {
   const MAX_DEPTH = 2;
   const validToolCalls = toolCalls.filter((tc) => tc?.function?.name);
@@ -3038,23 +3039,23 @@ async function handleToolCalls(
 
       pushStatus(`Executing ${toolPrefix} action...`);
 
-      let connData: any;
+      let account: any = null;
       try {
-        const connResp = await fetchWithTimeout(`${COMPOSIO_BASE}/connectedAccounts?user_uuid=default`, {
-          headers: { "x-api-key": COMPOSIO_API_KEY, "Content-Type": "application/json" },
-        }, 8000);
-        connData = await connResp.json();
+        if (composioUserId) {
+          const { data: row } = await sb
+            .from("composio_connections")
+            .select("connected_account_id,status")
+            .eq("user_id", composioUserId)
+            .eq("app_slug", toolPrefix.toLowerCase())
+            .maybeSingle();
+          if (row?.connected_account_id && (row.status === "active" || row.status === "initiated")) {
+            account = { id: row.connected_account_id };
+          }
+        }
       } catch {
         pushStatus("Integration service unavailable");
         continue;
       }
-
-      const accounts = connData.items || connData || [];
-      const appName = toolPrefix.toLowerCase();
-      const account = accounts.find((a: any) =>
-        (a.appName || "").toLowerCase().includes(appName) ||
-        (a.appUniqueId || "").toLowerCase().includes(appName)
-      );
 
       if (!account) {
         const serviceName = toolPrefix;
