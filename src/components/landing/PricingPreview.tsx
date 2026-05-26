@@ -168,7 +168,7 @@ const PricingPreview = () => {
                 </div>
               )}
               <div
-                className={`relative h-full rounded-2xl border bg-[#0a0a0a] p-5 sm:p-8 transition-all duration-300 hover:border-white/20 ${
+                className={`relative h-full overflow-hidden rounded-2xl border bg-[#0a0a0a] p-5 sm:p-8 transition-all duration-300 hover:border-white/20 ${
                   plan.bestOffer ? "border-emerald-500/40" : "border-white/[0.08]"
                 }`}
               >
