@@ -408,7 +408,8 @@ const App = () => {
                   <Route path="/images/tools/logo-generator" element={<ProtectedRoute><LogoGeneratorPage /></ProtectedRoute>} />
                   <Route path="/images/tools/perspective-correction" element={<ProtectedRoute><PerspectiveCorrectionPage /></ProtectedRoute>} />
                   {/* Legacy redirects: /tools/* -> /images/tools/* */}
-                  <Route path="/tools/:slug" element={<Navigate to="/images/tools" replace />} />
+                  <Route path="/tools/*" element={<LegacyToolsRedirect />} />
+
 
 
 
