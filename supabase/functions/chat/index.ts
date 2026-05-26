@@ -1487,7 +1487,7 @@ UNIVERSAL LANGUAGE & DIALECT RULE (HIGHEST PRIORITY — APPLIES TO EVERY MODE: c
             heartbeat = setInterval(() => {
               try { controller.enqueue(encoder.encode(`: keep-alive ${Date.now()}\n\n`)); } catch { /* stream closed */ }
             }, 12000);
-            await handleToolCalls(controller, encoder, forcedToolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY);
+            await handleToolCalls(controller, encoder, forcedToolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY, user_id);
           } catch (e) {
             console.error("forced tool flow error:", e);
             const isAr = /[\u0600-\u06FF]/.test(latestUserText);
@@ -1625,7 +1625,7 @@ UNIVERSAL LANGUAGE & DIALECT RULE (HIGHEST PRIORITY — APPLIES TO EVERY MODE: c
             if (data === "[DONE]") {
               if (toolCalls.length > 0) {
                 try {
-                  await handleToolCalls(controller, encoder, toolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY);
+                  await handleToolCalls(controller, encoder, toolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY, user_id);
                 } catch (e) {
                   console.error("tool flow error:", e);
                   if (isDeepResearch) {
@@ -1681,7 +1681,7 @@ UNIVERSAL LANGUAGE & DIALECT RULE (HIGHEST PRIORITY — APPLIES TO EVERY MODE: c
 
         if (toolCalls.length > 0) {
           try {
-            await handleToolCalls(controller, encoder, toolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY);
+            await handleToolCalls(controller, encoder, toolCalls, body, apiUrl, apiKey, modelId, SERPER_API_KEY, COMPOSIO_API_KEY, isDeepResearch, isShopping, searchTools, sb, 0, HB_API_KEY, user_id);
           } catch (e) {
             console.error("tool flow error:", e);
             if (isDeepResearch) {
