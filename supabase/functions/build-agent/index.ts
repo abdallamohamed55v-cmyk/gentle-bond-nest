@@ -1170,6 +1170,123 @@ const SYSTEM_PROMPT = `أنت Megsy Builder — مهندس ويب عالمي ي�
 بعد آخر استدعاء أداة، اكتب سطر أو سطرَين فقط بالعربية + وسوم \`<change file="path">سطر واحد</change>\` لكل ملف تم لمسه.`;
 
 
+// ───────── Claude Code orchestrator ─────────
+// Returns true if Claude Code handled the request (events were emitted via
+// `emit` and assistant text accumulated into `state`). Returns false if the
+// caller should fall back to the legacy AI SDK + fs_* loop.
+type ClaudeRunState = { text: string; fileEvents: Array<{ action: string; path: string; to?: string }> };
+
+async function ensureSandboxRunning(svc: ReturnType<typeof createClient>, projectId: string): Promise<{ ok: true; sandboxId: string } | { ok: false; error: string }> {
+  const { data: row } = await svc
+    .from("project_sandboxes")
+    .select("sandbox_id, status")
+    .eq("project_id", projectId)
+    .maybeSingle();
+  if (row?.sandbox_id && row.status === "running") return { ok: true, sandboxId: row.sandbox_id };
+  const started = await sandboxAction(svc, projectId, "start", {});
+  if (!started.ok) return { ok: false, error: started.error };
+  const data = (started as { data?: { sandbox_id?: string } }).data ?? {};
+  if (!data.sandbox_id) return { ok: false, error: "sandbox_start_no_id" };
+  return { ok: true, sandboxId: data.sandbox_id };
+}
+
+function buildClaudePrompt(history: Array<{ role: "user" | "assistant"; content: string }>, latest: string): string {
+  const recent = history.slice(-6).map((m) => {
+    const role = m.role === "user" ? "المستخدم" : "المساعد";
+    return `${role}: ${compactMessageContent(m.content).slice(0, 800)}`;
+  }).join("\n\n");
+  const preamble = `أنت تعمل داخل مشروع React + Vite + Tailwind + shadcn/ui موجود في /home/user/app.\nعدّل الملفات مباشرة (Edit / Write / MultiEdit) وكوّن مكونات أنيقة عالية الجودة.\nاكتب محتوى عربي حقيقي، RTL، semantic tokens فقط، بدون ألوان خام.\nبعد الانتهاء لخّص باختصار ما فعلته بالعربية.`;
+  return recent
+    ? `${preamble}\n\n# سياق المحادثة السابقة\n${recent}\n\n# طلب المستخدم الحالي\n${latest}`
+    : `${preamble}\n\n# طلب المستخدم\n${latest}`;
+}
+
+async function tryClaudeCode(
+  ctx: Ctx,
+  userPrompt: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+  emit: (e: Record<string, unknown>) => void | Promise<void>,
+  state: ClaudeRunState,
+): Promise<boolean> {
+  if (!E2B_API_KEY) return false;
+  const router = await getRouter();
+  if (!router?.key) return false;
+
+  // 1) Ensure sandbox is up
+  await emit({ type: "step", text: "sandbox: تشغيل/الاتصال بالـ E2B" });
+  const sbRes = await ensureSandboxRunning(ctx.supabase, ctx.projectId);
+  if (!sbRes.ok) {
+    await emit({ type: "warn", text: `سندبوكس غير متاح: ${sbRes.error} — رجوع للوضع الاحتياطي` });
+    return false;
+  }
+
+  const sb = await Sandbox.connect(sbRes.sandboxId, { apiKey: E2B_API_KEY });
+  await sb.setTimeout(SANDBOX_TIMEOUT_MS);
+
+  // 2) Bootstrap Claude Code (idempotent)
+  await emit({ type: "step", text: "claude: تهيئة المحرك" });
+  const boot = await bootstrapClaude(sb, router.key, CLAUDE_PROXY_MODEL);
+  if (!boot.ok) {
+    await emit({ type: "warn", text: `Claude bootstrap فشل — رجوع للوضع الاحتياطي\n${boot.log.slice(-300)}` });
+    return false;
+  }
+
+  // 3) Run claude -p with prompt
+  const sinceSec = Math.floor(Date.now() / 1000) - 5;
+  const prompt = buildClaudePrompt(history, userPrompt);
+  await emit({ type: "step", text: "claude: بدء التنفيذ" });
+
+  try {
+    for await (const evt of runClaudeStream(sb, prompt, { cwd: SANDBOX_APP_DIR, maxTurns: 50 })) {
+      if (evt.type === "text") {
+        state.text += evt.delta;
+        await emit({ type: "text", delta: evt.delta });
+      } else if (evt.type === "file") {
+        state.fileEvents.push({ action: evt.action, path: evt.path, to: evt.to });
+        await emit({ type: "file", action: evt.action, path: evt.path, to: evt.to });
+      } else if (evt.type === "step" || evt.type === "warn" || evt.type === "tool_use" || evt.type === "tool_result") {
+        await emit(evt as Record<string, unknown>);
+      } else if (evt.type === "error") {
+        await emit({ type: "warn", text: evt.message });
+      } else if (evt.type === "done") {
+        // continue to file sync
+      }
+    }
+  } catch (e) {
+    await emit({ type: "warn", text: `claude execution error: ${(e as Error).message}` });
+    return false;
+  }
+
+  // 4) Sync changed files back to Supabase (best-effort, non-blocking on errors)
+  try {
+    const changed = await listChangedFiles(sb, sinceSec, SANDBOX_APP_DIR);
+    let synced = 0;
+    for (const rel of changed) {
+      if (rel.startsWith("node_modules") || rel.startsWith(".git")) continue;
+      try {
+        const content = await sb.files.read(`${SANDBOX_APP_DIR}/${rel}`);
+        const text = typeof content === "string" ? content : new TextDecoder().decode(content as Uint8Array);
+        if (text.length > 256 * 1024) continue;
+        await ctx.supabase.from("ai_project_files").upsert(
+          { project_id: ctx.projectId, path: rel, content: text, updated_at: new Date().toISOString() },
+          { onConflict: "project_id,path" },
+        );
+        // record once if not already in fileEvents
+        if (!state.fileEvents.find((f) => f.path === rel)) {
+          state.fileEvents.push({ action: "update", path: rel });
+          await emit({ type: "file", action: "update", path: rel });
+        }
+        synced++;
+      } catch { /* ignore individual file errors */ }
+    }
+    if (synced > 0) await emit({ type: "step", text: `synced ${synced} files إلى التخزين` });
+  } catch (e) {
+    console.warn("claude file sync warning:", (e as Error).message);
+  }
+
+  return true;
+}
+
 // ───────── HTTP handler ─────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
