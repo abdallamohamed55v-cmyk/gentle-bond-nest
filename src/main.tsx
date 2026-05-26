@@ -7,7 +7,12 @@ import "./styles/megsy-build-redesign.css";
 import { reportError } from "@/lib/errors";
 
 // Prevent right-click context menu
-document.addEventListener("contextmenu", (e) => e.preventDefault());
+// Prevent right-click context menu, except inside editable fields so users can copy/paste normally
+document.addEventListener("contextmenu", (e) => {
+  const t = e.target as HTMLElement | null;
+  if (t && t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
+  e.preventDefault();
+});
 
 // Report any unhandled error or promise rejection to the admin (best-effort).
 let __lastReport = 0;
