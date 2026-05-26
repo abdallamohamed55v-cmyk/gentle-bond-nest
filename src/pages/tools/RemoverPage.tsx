@@ -21,6 +21,7 @@ const GRADIENT_BORDER =
 const RemoverPage = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { hasEnoughCredits } = useCredits();
   const [stage, setStage] = useState<Stage>("landing");
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
