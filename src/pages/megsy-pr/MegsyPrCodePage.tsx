@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronDown, ChevronRight, FileText, Folder, FolderOpen, S
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { projectSandbox, type SandboxRow, type SandboxStatus } from "@/lib/projectSandbox";
+import { detectProjectRuntime } from "@/lib/detectProjectType";
+import WebContainerPreview from "@/components/code/WebContainerPreview";
 
 interface FileRow { id: string; path: string; content: string; updated_at: string }
 
@@ -507,8 +509,12 @@ export default function MegsyPrCodePage() {
                 Pick a file from the list to view its content here.
               </div>
             )}
-            {overlayTab === "preview" && (
-              sandbox?.dev_url ? (
+            {overlayTab === "preview" && (() => {
+              const runtime = detectProjectRuntime(files);
+              if (runtime === "webcontainer" && projectId && files.length > 0) {
+                return <WebContainerPreview projectId={projectId} files={files} />;
+              }
+              return sandbox?.dev_url ? (
                 <iframe
                   ref={previewIframeRef}
                   key={iframeKey}
@@ -520,8 +526,8 @@ export default function MegsyPrCodePage() {
                 <div className="grid place-items-center h-full text-sm text-muted-foreground p-6 text-center">
                   No active sandbox. Press Run from the top of the page to start the preview.
                 </div>
-              )
-            )}
+              );
+            })()}
             {overlayTab === "terminal" && (
               <pre dir="ltr" className="text-[12px] leading-[1.55] font-mono p-4 whitespace-pre-wrap text-foreground/90">
                 {logs || (sandbox?.sandbox_id ? "(no logs yet)" : "No active sandbox.")}
