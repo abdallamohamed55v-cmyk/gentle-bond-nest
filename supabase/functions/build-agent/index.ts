@@ -1208,9 +1208,16 @@ async function tryClaudeCode(
   emit: (e: Record<string, unknown>) => void | Promise<void>,
   state: ClaudeRunState,
 ): Promise<boolean> {
-  if (!E2B_API_KEY) return false;
+  if (!E2B_API_KEY) {
+    await emit({ type: "warn", text: "diag: E2B_API_KEY مش موجود في Supabase function secrets → fallback" });
+    return false;
+  }
   const router = await getRouter();
-  if (!router?.key) return false;
+  if (!router?.key) {
+    await emit({ type: "warn", text: "diag: مفيش openrouter key (لا في api_keys ولا OPENROUTER_API_KEY env) → fallback" });
+    return false;
+  }
+  await emit({ type: "step", text: `diag: openrouter OK len=${router.key.length} prefix=${router.key.slice(0,6)}` });
 
   // 1) Ensure sandbox is up
   await emit({ type: "step", text: "sandbox: تشغيل/الاتصال بالـ E2B" });
