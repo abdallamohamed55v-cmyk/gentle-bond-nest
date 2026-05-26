@@ -234,11 +234,20 @@ const IntegrationsPage = () => {
       >
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-muted border border-border/60 grid place-items-center shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
-            {iconUrl ? (
-              <img src={iconUrl} alt="" className="w-6 h-6 dark:invert" loading="lazy" />
-            ) : (
-              <span className="text-[14px] font-semibold text-foreground/70">{integration.name.charAt(0)}</span>
-            )}
+            <img
+              src={iconUrl}
+              alt=""
+              className="w-6 h-6 dark:invert"
+              loading="lazy"
+              onError={(e) => {
+                const el = e.currentTarget;
+                el.style.display = "none";
+                const fb = el.nextElementSibling as HTMLElement | null;
+                if (fb) fb.style.display = "inline";
+              }}
+            />
+            <span className="hidden text-[14px] font-semibold text-foreground/70">{integration.name.charAt(0)}</span>
+
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-1">
