@@ -236,6 +236,11 @@ const InpaintPage = () => {
     if (!sourceImage) { toast.error("Please upload an image"); return; }
     if (!hasMaskSelection()) { toast.error("Select the part you want to edit first"); return; }
     if (!prompt.trim()) { setPromptOpen(true); return; }
+    if (!hasEnoughCredits(INPAINT_COST)) {
+      toast.error("Insufficient MC");
+      navigate("/pricing");
+      return;
+    }
     setPromptOpen(false);
     setIsGenerating(true);
     try {
