@@ -99,20 +99,60 @@ Deno.serve(async (req) => {
     let interval: Interval = "monthly";
     let product_id = "";
 
+    // ---- Resolve product_id from DB first, fall back to hardcoded map ----
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    async function resolveFromDb(t: Tier, i: Interval): Promise<string | null> {
+      const { data } = await adminClient
+        .from("dodo_products")
+        .select("product_id")
+        .eq("tier", t)
+        .eq("interval", i)
+        .eq("active", true)
+        .maybeSingle();
+      return data?.product_id ?? null;
+    }
+
+    async function lookupByProductId(pid: string): Promise<{ tier: Tier; interval: Interval } | null> {
+      const { data } = await adminClient
+        .from("dodo_products")
+        .select("tier, interval")
+        .eq("product_id", pid)
+        .eq("active", true)
+        .maybeSingle();
+      if (data) return { tier: data.tier as Tier, interval: data.interval as Interval };
+      return PRODUCT_INDEX[pid] ?? null;
+    }
+
     if (rawTier && (rawTier === "starter" || rawTier === "pro" || rawTier === "elite" || rawTier === "business")) {
       tier = rawTier;
       interval = rawInterval === "yearly" ? "yearly" : "monthly";
-      product_id = PRODUCT_MAP[tier][interval];
-    } else if (rawProductId && PRODUCT_INDEX[rawProductId]) {
-      // Back-compat path — resolve tier/interval from server index.
-      const ix = PRODUCT_INDEX[rawProductId];
+      product_id = (await resolveFromDb(tier, interval)) || PRODUCT_MAP[tier][interval];
+    } else if (rawProductId) {
+      const ix = await lookupByProductId(rawProductId);
+      if (!ix) {
+        return new Response(
+          JSON.stringify({ error: "invalid_plan", message: "Unknown product_id." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
       tier = ix.tier;
       interval = ix.interval;
       product_id = rawProductId;
     } else {
       return new Response(
-        JSON.stringify({ error: "invalid_plan", message: "Unknown tier or product_id." }),
+        JSON.stringify({ error: "invalid_plan", message: "Missing tier or product_id." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (!product_id) {
+      return new Response(
+        JSON.stringify({ error: "product_id_missing", message: `No product_id configured for ${tier}/${interval}. Add it in the dodo_products table.` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 

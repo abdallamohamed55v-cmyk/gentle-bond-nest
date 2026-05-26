@@ -1648,6 +1648,36 @@ export type Database = {
         }
         Relationships: []
       }
+      dodo_products: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          interval: string
+          product_id: string
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          interval: string
+          product_id: string
+          tier: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          interval?: string
+          product_id?: string
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       e2b_executions: {
         Row: {
           conversation_id: string | null
