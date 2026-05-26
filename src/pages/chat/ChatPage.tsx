@@ -3,7 +3,6 @@ import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } fro
 import { createPortal } from "react-dom";
 import { Highlighter } from "@/components/magicui/highlighter";
 import UnlockProButton from "@/components/branding/UnlockProButton";
-import { useUserPlan } from "@/hooks/useUserPlan";
 import { motion, AnimatePresence, useMotionValue, useTransform, animate, type PanInfo } from "framer-motion";
 import { Menu, Plus, Camera, Image, FileUp, X, GraduationCap, ShoppingCart, ArrowDown, ChevronDown, ChevronLeft, Star, Pencil, Trash2, FolderPlus, Globe, Lock, Share2, MoreVertical, MoreHorizontal, Pin, UserPlus, Copy, Mail, Link2, Users, Loader2, NotebookPen, ClipboardList, CalendarDays, Timer, Wrench, Lightbulb, Mic2, Sparkles, BookOpen, Check, Cpu, Bot, Atom, Music2, Layers, ClipboardCheck, Volume2, Play, Telescope, Presentation, FileText, Projector, ScrollText, Workflow, LayoutTemplate } from "lucide-react";
 import { toast } from "sonner";
