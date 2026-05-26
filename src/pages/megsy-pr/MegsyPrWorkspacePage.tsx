@@ -12,6 +12,8 @@ import MobileChatView from "@/components/megsy-pr/MobileChatView";
 import MobilePreviewView from "@/components/megsy-pr/MobilePreviewView";
 import AppSidebar from "@/components/layout/AppSidebar";
 import { getProjectDraft, saveProjectDraftDebounced } from "@/lib/projectDrafts";
+import { detectProjectRuntime } from "@/lib/detectProjectType";
+import WebContainerPreview from "@/components/code/WebContainerPreview";
 
 // In-memory active job tracker (DB `background_jobs` is source of truth; this is just a fast lookup).
 const buildAgentActiveJobs = new Map<string, string>();
@@ -1905,6 +1907,17 @@ function BuildPreview({ files, projectId, streaming, device = "desktop", sandbox
     return (
       <div className="h-full w-full grid place-items-center text-muted-foreground text-sm">
         Start the chat to generate the project
+      </div>
+    );
+  }
+
+  // Prefer WebContainers for any web project (instant in-browser Node).
+  // Falls back to the published preview URL or bundler-fast for backend projects.
+  const useWebContainer = !sandboxDevUrl && projectId && detectProjectRuntime(files) === "webcontainer";
+  if (useWebContainer) {
+    return (
+      <div className="relative h-full w-full">
+        <WebContainerPreview projectId={projectId} files={files} />
       </div>
     );
   }
