@@ -3513,7 +3513,7 @@ Ask me anything to get started!`;
           onRename={() => { setRenameValue(conversationTitle); setIsRenaming(true); }}
           onTogglePin={handleTogglePin}
           onDelete={handleDelete}
-          rightSlot={!hasConversation ? <UnlockProButton onClick={() => navigate("/pricing")} aria-label="Get Plus" text="Get Plus" /> : null}
+          rightSlot={!hasConversation && !["pro","business","elite"].includes((userPlan||"").toLowerCase()) ? <UnlockProButton onClick={() => navigate("/pricing")} aria-label="Get Plus" text="Get Plus" /> : null}
         />
 
         {/* Desktop header (mobile bits hidden via md:hidden / hidden md:flex inside) */}
