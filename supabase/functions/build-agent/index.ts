@@ -1208,11 +1208,14 @@ async function tryClaudeCode(
   emit: (e: Record<string, unknown>) => void | Promise<void>,
   state: ClaudeRunState,
 ): Promise<boolean> {
+  console.log("[claude] tryClaudeCode start", { hasE2B: !!E2B_API_KEY });
   if (!E2B_API_KEY) {
+    console.warn("[claude] missing E2B_API_KEY");
     await emit({ type: "warn", text: "diag: E2B_API_KEY مش موجود في Supabase function secrets → fallback" });
     return false;
   }
   const router = await getRouter();
+  console.log("[claude] router", { hasKey: !!router?.key, keyLen: router?.key?.length });
   if (!router?.key) {
     await emit({ type: "warn", text: "diag: مفيش openrouter key (لا في api_keys ولا OPENROUTER_API_KEY env) → fallback" });
     return false;
@@ -1222,6 +1225,7 @@ async function tryClaudeCode(
   // 1) Ensure sandbox is up
   await emit({ type: "step", text: "sandbox: تشغيل/الاتصال بالـ E2B" });
   const sbRes = await ensureSandboxRunning(ctx.supabase, ctx.projectId);
+  console.log("[claude] sandbox", sbRes);
   if (!sbRes.ok) {
     await emit({ type: "warn", text: `سندبوكس غير متاح: ${sbRes.error} — رجوع للوضع الاحتياطي` });
     return false;
