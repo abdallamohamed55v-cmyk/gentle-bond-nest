@@ -11,6 +11,13 @@ import CookieConsent from "./components/common/CookieConsent";
 import TranslationWrapper from "./components/common/TranslationWrapper";
 import MegsyPrRedirect from "./components/megsy-pr/MegsyPrRedirect";
 
+// Redirect legacy /tools/<slug> to /images/tools/<slug>
+const LegacyToolsRedirect = () => {
+  const location = useLocation();
+  const rest = location.pathname.replace(/^\/tools/, "");
+  return <Navigate to={`/images/tools${rest}`} replace />;
+};
+
 // Critical pages — eagerly loaded (landing only; everything else is lazy)
 import LandingPage from "./pages/marketing/LandingPage";
 
