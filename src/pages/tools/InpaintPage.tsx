@@ -7,6 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import inpaintHero from "@/assets/inpaint-hero.webp";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useCredits } from "@/hooks/useCredits";
+
+const INPAINT_COST = 1;
 
 type Stage = "landing" | "edit" | "result";
 type Tool = "brush" | "eraser";
@@ -18,6 +21,7 @@ const GRADIENT_BORDER =
 const InpaintPage = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { hasEnoughCredits } = useCredits();
   const [stage, setStage] = useState<Stage>("landing");
   const [sourceImage, setSourceImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
@@ -232,6 +236,11 @@ const InpaintPage = () => {
     if (!sourceImage) { toast.error("Please upload an image"); return; }
     if (!hasMaskSelection()) { toast.error("Select the part you want to edit first"); return; }
     if (!prompt.trim()) { setPromptOpen(true); return; }
+    if (!hasEnoughCredits(INPAINT_COST)) {
+      toast.error("Insufficient MC");
+      navigate("/pricing");
+      return;
+    }
     setPromptOpen(false);
     setIsGenerating(true);
     try {
