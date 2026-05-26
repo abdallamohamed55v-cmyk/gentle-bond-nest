@@ -152,7 +152,7 @@ const PricingPreview = () => {
           </p>
         </motion.div>
 
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
           {plans.map((plan, i) => (
             <motion.div
               key={plan.name}
@@ -160,7 +160,7 @@ const PricingPreview = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: i * 0.1 }}
-              className="relative"
+              className="relative min-w-0"
             >
               {plan.bestOffer && (
                 <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 rounded-md bg-emerald-500 px-5 py-1 text-xs font-bold uppercase tracking-wider text-black shadow-lg shadow-emerald-500/30">
