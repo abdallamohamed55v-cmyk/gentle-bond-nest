@@ -3039,23 +3039,23 @@ async function handleToolCalls(
 
       pushStatus(`Executing ${toolPrefix} action...`);
 
-      let connData: any;
+      let account: any = null;
       try {
-        const connResp = await fetchWithTimeout(`${COMPOSIO_BASE}/connectedAccounts?user_uuid=default`, {
-          headers: { "x-api-key": COMPOSIO_API_KEY, "Content-Type": "application/json" },
-        }, 8000);
-        connData = await connResp.json();
+        if (composioUserId) {
+          const { data: row } = await sb
+            .from("composio_connections")
+            .select("connected_account_id,status")
+            .eq("user_id", composioUserId)
+            .eq("app_slug", toolPrefix.toLowerCase())
+            .maybeSingle();
+          if (row?.connected_account_id && (row.status === "active" || row.status === "initiated")) {
+            account = { id: row.connected_account_id };
+          }
+        }
       } catch {
         pushStatus("Integration service unavailable");
         continue;
       }
-
-      const accounts = connData.items || connData || [];
-      const appName = toolPrefix.toLowerCase();
-      const account = accounts.find((a: any) =>
-        (a.appName || "").toLowerCase().includes(appName) ||
-        (a.appUniqueId || "").toLowerCase().includes(appName)
-      );
 
       if (!account) {
         const serviceName = toolPrefix;
