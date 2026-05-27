@@ -1,1 +1,0 @@
-UPDATE public.model_pricing SET credits_per_unit = 0, badge = 'FREE' WHERE provider = 'deapi' AND kind = 'image';

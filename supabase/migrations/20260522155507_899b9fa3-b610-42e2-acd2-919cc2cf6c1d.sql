@@ -1,1 +1,0 @@
-UPDATE public.api_keys SET is_active = false WHERE service = 'agentrouter';

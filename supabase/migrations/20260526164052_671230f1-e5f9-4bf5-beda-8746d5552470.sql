@@ -1,1 +1,0 @@
-ALTER TABLE public.project_sandboxes ADD COLUMN IF NOT EXISTS hmr_upgraded_at timestamptz;
