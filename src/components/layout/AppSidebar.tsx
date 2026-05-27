@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSidebarCollapsed } from "@/hooks/useSidebarCollapsed";
 import MegsyStar from "@/components/files/MegsyStar";
-import { ChatIcon, MediaIcon, CodeIcon, CornIcon } from "@/components/sidebar/SidebarIcons";
+import { ChatIcon, MediaIcon, CodeIcon, CornIcon, EarnIcon } from "@/components/sidebar/SidebarIcons";
 import { useActiveWorkspaceId, WORKSPACE_CHANGED_EVENT } from "@/lib/activeWorkspace";
 import WorkspaceSwitcher from "@/components/workspace/WorkspaceSwitcher";
 import { useActiveAccount } from "@/hooks/useActiveAccount";
@@ -215,11 +215,11 @@ const AppSidebar = ({
     if (inline) setCollapsed(true);
   }, [inline, setCollapsed]);
 
-  const navItems = [
+  const navItems: Array<{ label: string; Icon: typeof ChatIcon; path: string; match: (p: string) => boolean; beta?: boolean; isNew?: boolean }> = [
     { label: "Chat", Icon: ChatIcon, path: "/chat", match: (p: string) => p.startsWith("/chat") },
     { label: "Media", Icon: MediaIcon, path: "/media", match: (p: string) => p.startsWith("/media") || p.startsWith("/images") || p.startsWith("/videos") || p.startsWith("/lipsync") },
     { label: "Code", Icon: CodeIcon, path: "/build", match: (p: string) => p.startsWith("/build"), beta: true },
-    
+    { label: "Earn", Icon: EarnIcon, path: "/settings/referrals", match: (p: string) => p.startsWith("/settings/referrals"), isNew: true },
   ];
 
   const handleNewChat = () => {
@@ -268,7 +268,7 @@ const AppSidebar = ({
 
       {/* NAV — fixed top section */}
       <div className={`shrink-0 ${isCollapsed ? "px-2 py-2 flex flex-col items-center gap-1" : "px-3 py-3 space-y-1"}`}>
-        {navItems.map(({ label, Icon, path, match, beta }) => {
+        {navItems.map(({ label, Icon, path, match, beta, isNew }) => {
           const active = match(location.pathname);
           if (isCollapsed) {
             return (
@@ -278,6 +278,7 @@ const AppSidebar = ({
                 onMouseEnter={() => prefetchRoute(path)}
                 onFocus={() => prefetchRoute(path)}
                 title={label}
+                aria-label={label}
                 className={`relative w-10 h-10 grid place-items-center rounded-xl transition-colors ${
                   active ? "bg-foreground/10 text-foreground" : "text-foreground/75 hover:text-foreground hover:bg-foreground/[0.05]"
                 }`}
@@ -287,6 +288,9 @@ const AppSidebar = ({
                   <span className="absolute -top-1 -right-1 px-[5px] py-[2px] rounded-full bg-amber-500 text-black text-[9px] font-bold leading-none shadow-sm">
                     Beta
                   </span>
+                )}
+                {isNew && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-background animate-pulse" />
                 )}
               </button>
             );
@@ -304,8 +308,13 @@ const AppSidebar = ({
               <Icon size={18} />
               <span className="text-[14px] font-medium">{label}</span>
               {beta && (
-                <span className="mr-auto px-[6px] py-[2px] rounded-full bg-amber-500 text-black text-[10px] font-bold leading-none shadow-sm">
+                <span className="ml-auto px-[6px] py-[2px] rounded-full bg-amber-500 text-black text-[10px] font-bold leading-none shadow-sm">
                   Beta
+                </span>
+              )}
+              {isNew && (
+                <span className="ml-auto px-[6px] py-[2px] rounded-full bg-emerald-500 text-white text-[10px] font-bold leading-none shadow-sm">
+                  NEW
                 </span>
               )}
             </button>

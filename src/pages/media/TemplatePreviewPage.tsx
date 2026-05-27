@@ -148,15 +148,15 @@ const TemplatePreviewPage = () => {
           </motion.div>
 
           {/* Bottom prompt + CTA */}
-          <div className="absolute bottom-0 inset-x-0 z-20 px-4 pt-10 pb-6 bg-gradient-to-t from-black via-black/85 to-transparent">
+          <div className="absolute bottom-0 inset-x-0 z-20 px-4 pt-12 pb-6 bg-gradient-to-t from-black via-black/95 to-transparent">
             <div className="max-w-[560px] mx-auto">
               <button
                 onClick={handleUseClick}
-                className="theme-fixed w-full h-14 rounded-2xl bg-white text-black font-semibold text-[15px] flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-[0_20px_50px_-10px_rgba(255,255,255,0.25)]"
+                className="theme-fixed w-full h-14 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-pink-500 to-orange-400 text-white font-bold text-[15px] flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-[0_20px_50px_-10px_rgba(236,72,153,0.55)]"
               >
                 Use this template
               </button>
-              <p className="theme-fixed mt-2 text-center text-[11px] font-medium text-white/70">
+              <p className="theme-fixed mt-2 text-center text-[11px] font-medium text-white/80">
                 Upload a photo or video — or skip to copy the prompt
               </p>
             </div>

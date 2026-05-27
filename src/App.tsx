@@ -98,6 +98,9 @@ const SecurityPage = lazy(() => import("./pages/settings/SecurityPage"));
 const SupportPage = lazy(() => import("./pages/marketing/SupportPage"));
 const EnterprisePage = lazy(() => import("./pages/marketing/EnterprisePage"));
 const AboutPage = lazy(() => import("./pages/marketing/AboutPage"));
+const BlogPage = lazy(() => import("./pages/marketing/BlogPage"));
+const BlogPostPage = lazy(() => import("./pages/marketing/BlogPostPage"));
+const ComparisonPage = lazy(() => import("./pages/marketing/ComparisonPage"));
 const VideoToTextPage = lazy(() => import("./pages/tools/VideoToTextPage"));
 const AIPersonalizationPage = lazy(() => import("./pages/settings/AIPersonalizationPage"));
 const MemoryPage = lazy(() => import("./pages/settings/MemoryPage"));
@@ -161,7 +164,8 @@ const AcceptWorkspaceInvitePage = lazy(() => import("./pages/auth/AcceptWorkspac
 
 const queryClient = new QueryClient();
 
-const LazyFallback = () => <div className="h-screen bg-background" />;
+import PageLoader from "@/components/common/PageLoader";
+const LazyFallback = () => <PageLoader />;
 
 // Scroll to top on every route change
 const ScrollToTop = () => {
@@ -211,14 +215,14 @@ const App = () => {
     };
     // Allow `?theme=dark|light|ocean|sunset` URL override (also persists)
     const urlTheme = new URLSearchParams(window.location.search).get("theme");
-    const savedTheme = urlTheme || localStorage.getItem("theme") || "light";
+    const savedTheme = urlTheme || localStorage.getItem("theme") || "dark";
     if (urlTheme) localStorage.setItem("theme", urlTheme);
     applyTheme(savedTheme);
     const savedAccent = localStorage.getItem("accent");
     if (savedAccent) document.documentElement.style.setProperty("--primary", savedAccent);
 
     // React to theme changes from anywhere in the app
-    const onThemeChange = () => applyTheme(localStorage.getItem("theme") || "light");
+    const onThemeChange = () => applyTheme(localStorage.getItem("theme") || "dark");
     window.addEventListener("themechange-custom", onThemeChange);
     window.addEventListener("storage", (e) => { if (!e.key || e.key === "theme") onThemeChange(); });
 
@@ -376,6 +380,9 @@ const App = () => {
                   <Route path="/security" element={<SecurityPage />} />
                   <Route path="/enterprise" element={<EnterprisePage />} />
                   <Route path="/about" element={<AboutPage />} />
+                  <Route path="/blog" element={<BlogPage />} />
+                  <Route path="/blog/:slug" element={<BlogPostPage />} />
+                  <Route path="/vs/:slug" element={<ComparisonPage />} />
 
                   {/* Sharing */}
                   <Route path="/share/:shareId" element={<SharedChatPage />} />

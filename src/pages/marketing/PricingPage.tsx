@@ -76,6 +76,7 @@ const PLANS: PlanCardConfig[] = [
     yearlyCredits: "2,880 MC / year",
     features: [
       "Unlimited chat — all models",
+      "Megsy OS — autonomous 24/7 agent",
       "Unlimited image generation",
       "Unlimited Slides, Docs & Deep Research",
       "Video generation (credit-based)",

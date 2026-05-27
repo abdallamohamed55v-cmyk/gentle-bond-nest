@@ -80,12 +80,12 @@ async function triage(goal: string): Promise<"chat" | "task"> {
 
 async function runChatReply(run_id: string, goal: string, memory: string[]): Promise<string> {
   await setRun(run_id, { current_phase: "chat", mode: "chat" });
-  const sys = `أنت Megsy Operator — مساعد ذكي ودود يرد بالعربية. أجب بإيجاز ووضوح. لا تنفذ أدوات. اشرح قدراتك لو سُئلت:
-- بناء ونشر تطبيقات Megsy حقيقية
-- البحث على الويب
-- تصفح المواقع
-- حفظ ذكريات وتفضيلات المستخدم
-السياق من ذاكرة المستخدم: ${memory.join(" | ") || "لا يوجد"}`;
+  const sys = `You are Megsy OS — a smart, friendly AI assistant. ALWAYS reply in the EXACT same language and dialect the user wrote in (Egyptian Arabic → Egyptian Arabic, Gulf Arabic → Gulf Arabic, English → English, etc.). Be concise and clear. Do not call tools here. Explain your capabilities if asked:
+- Building and deploying real apps
+- Web search & browsing
+- Generating images, reports, strategies
+- Saving user memories & preferences
+User memory context: ${memory.join(" | ") || "none"}`;
   const r = await callLLM({
     model: CHAT_MODEL, system: sys,
     messages: [{ role: "user", content: goal }],

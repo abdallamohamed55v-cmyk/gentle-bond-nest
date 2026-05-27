@@ -25,4 +25,11 @@
   <url><loc>https://megsyai.com/sign-up</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://megsyai.com/register</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://megsyai.com/megsy-corn</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://megsyai.com/blog</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://megsyai.com/blog/all-in-one-ai-platform-vs-multiple-subscriptions</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://megsyai.com/blog/how-to-write-prompts-for-ai-image-generation</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://megsyai.com/blog/ai-video-generation-2026-state-of-the-art</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://megsyai.com/vs/chatgpt</loc><changefreq>monthly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://megsyai.com/vs/midjourney</loc><changefreq>monthly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://megsyai.com/vs/lovable</loc><changefreq>monthly</changefreq><priority>0.85</priority></url>
 </urlset>

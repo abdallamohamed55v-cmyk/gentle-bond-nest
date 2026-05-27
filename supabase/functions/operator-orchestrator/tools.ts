@@ -405,25 +405,35 @@ export async function saveMemory(input: { user_id: string; fact: string; importa
   }
 }
 
-// ---------- LLM call via Lovable AI Gateway ----------
+// ---------- LLM call: OpenRouter (Kimi K2) → Lovable Gateway fallback ----------
+const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
+const KIMI_MODEL = "moonshotai/kimi-k2";
+
 export async function callLLM(args: {
   model: string;
   system: string;
   messages: Array<{ role: string; content: string }>;
   json?: boolean;
 }): Promise<{ ok: boolean; content?: string; error?: string }> {
-  if (!LOVABLE_KEY) return { ok: false, error: "LOVABLE_API_KEY missing" };
+  const useOpenRouter = !!OPENROUTER_KEY;
+  const endpoint = useOpenRouter
+    ? "https://openrouter.ai/api/v1/chat/completions"
+    : "https://ai.gateway.lovable.dev/v1/chat/completions";
+  const key = useOpenRouter ? OPENROUTER_KEY : LOVABLE_KEY;
+  if (!key) return { ok: false, error: "No LLM key (OPENROUTER_API_KEY/LOVABLE_API_KEY) configured" };
+  const model = useOpenRouter ? KIMI_MODEL : args.model;
   try {
     const body: Record<string, unknown> = {
-      model: args.model,
+      model,
       messages: [{ role: "system", content: args.system }, ...args.messages],
     };
     if (args.json) body.response_format = { type: "json_object" };
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const r = await fetch(endpoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_KEY}`,
+        Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
+        ...(useOpenRouter ? { "HTTP-Referer": "https://megsy.app", "X-Title": "Megsy Operator" } : {}),
       },
       body: JSON.stringify(body),
     });

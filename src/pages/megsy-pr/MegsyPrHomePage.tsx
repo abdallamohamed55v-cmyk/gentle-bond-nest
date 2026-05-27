@@ -730,17 +730,17 @@ function ProjectsTemplatesTabs({
   const [tab, setTab] = useState<"mine" | "templates">("mine");
 
   return (
-    <div dir="rtl" className="space-y-8">
+    <div className="space-y-8">
       {/* Header with title + segmented tabs */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
           <h1
-            className="text-5xl md:text-6xl italic text-foreground leading-none"
+            className="text-5xl md:text-6xl italic text-foreground leading-none text-left"
             style={{ fontFamily: "'Instrument Serif', serif" }}
           >
             {tab === "mine" ? "Your projects" : "Templates"}
           </h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-sm text-left">
             {tab === "mine" ? "Resume where you left off" : "Get started fast from a ready template"}
           </p>
         </div>
@@ -776,7 +776,7 @@ function ProjectsTemplatesTabs({
             You have no projects yet — Start your first project from the top.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 auto-rows-fr">
             {projects.map((p, i) => {
               const liveUrl = p.published_url || p.preview_url;
               const shot = p.thumbnail_url || mshotFor(liveUrl);
@@ -785,50 +785,35 @@ function ProjectsTemplatesTabs({
                 <button
                   key={p.id}
                   onClick={() => onOpenProject(p.id)}
-                  className={`group relative overflow-hidden rounded-3xl border border-foreground/10 bg-foreground/[0.03] hover:border-purple-500/50 transition-all duration-500 text-right ${
-                    featured ? "md:col-span-2 md:row-span-2" : "rounded-2xl"
+                  className={`group relative overflow-hidden rounded-2xl border border-foreground/10 bg-foreground/[0.03] hover:border-purple-500/50 transition-all duration-500 text-left flex flex-col ${
+                    featured ? "sm:col-span-2 md:col-span-2" : ""
                   }`}
                 >
-                  <div className={`w-full overflow-hidden ${featured ? "aspect-[16/10]" : "aspect-[16/10]"}`}>
-                    {shot ? (
+                  <div className="w-full overflow-hidden aspect-[16/10] bg-gradient-to-br from-purple-500/20 via-foreground/[0.04] to-transparent relative">
+                    {shot && (
                       <img
                         src={shot}
                         alt={p.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         loading="lazy"
                         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                       />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-500/20 via-foreground/[0.04] to-transparent relative">
-                        <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-500/20 via-transparent to-transparent" />
-                      </div>
-                    )}
-                    {featured && (
-                      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent pointer-events-none" />
                     )}
                   </div>
 
-                  {featured ? (
-                    <div className="absolute bottom-0 w-full p-6 md:p-8 space-y-2 text-right">
-                      <div className="flex items-center gap-2 justify-end">
-                        <span className="text-muted-foreground text-xs italic">
-                          Last modified {new Date(p.updated_at).toLocaleDateString()}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-500 dark:text-purple-300 text-[10px] font-semibold">
-                          Featured project
-                        </span>
-                      </div>
-                      <h3 className="text-xl md:text-2xl font-semibold text-foreground group-hover:text-purple-500 transition-colors truncate">
-                        {p.name || "Untitled"}
-                      </h3>
-                    </div>
-                  ) : (
-                    <div className="p-5 space-y-1">
-                      <h4 className="text-base font-medium text-foreground group-hover:text-purple-500 transition-colors truncate">
-                        {p.name || "Untitled"}
-                      </h4>
-                    </div>
-                  )}
+                  <div className="p-5 space-y-1 flex-1">
+                    {featured && (
+                      <span className="inline-block px-2 py-0.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-500 dark:text-purple-300 text-[10px] font-semibold mb-1">
+                        Featured project
+                      </span>
+                    )}
+                    <h4 className={`font-medium text-foreground group-hover:text-purple-500 transition-colors truncate ${featured ? "text-lg md:text-xl" : "text-base"}`}>
+                      {p.name || "Untitled"}
+                    </h4>
+                    <p className="text-muted-foreground text-xs italic">
+                      Last modified {new Date(p.updated_at).toLocaleDateString()}
+                    </p>
+                  </div>
                 </button>
               );
             })}

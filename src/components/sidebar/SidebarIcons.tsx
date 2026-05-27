@@ -49,3 +49,14 @@ export const CornIcon = ({ size = 20, className, strokeWidth = 1.7 }: Props) => 
     <circle cx="12" cy="12" r="0.9" fill="currentColor" />
   </svg>
 );
+
+export const EarnIcon = ({ size = 20, className, strokeWidth = 1.7 }: Props) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}
+    xmlns="http://www.w3.org/2000/svg" aria-hidden>
+    {/* Original mark: faceted gem with inner crown — rewards/value */}
+    <path d="M6 5.5h12l3 4.2-9 9.3-9-9.3 3-4.2Z"
+      stroke="currentColor" strokeWidth={strokeWidth} strokeLinejoin="round" />
+    <path d="M3 9.7h18M9 9.7l3 9.3 3-9.3M9 9.7 12 5.5l3 4.2"
+      stroke="currentColor" strokeWidth={strokeWidth} strokeLinejoin="round" strokeLinecap="round" />
+  </svg>
+);

@@ -15,6 +15,17 @@ const footerLinks = {
     { label: "Enterprise", href: "/enterprise" },
     { label: "About", href: "/about" },
   ],
+  Resources: [
+    { label: "Blog", href: "/blog" },
+    { label: "All-in-one vs Stack", href: "/blog/all-in-one-ai-platform-vs-multiple-subscriptions" },
+    { label: "Prompt Writing Guide", href: "/blog/how-to-write-prompts-for-ai-image-generation" },
+    { label: "AI Video 2026", href: "/blog/ai-video-generation-2026-state-of-the-art" },
+  ],
+  Compare: [
+    { label: "Megsy vs ChatGPT", href: "/vs/chatgpt" },
+    { label: "Megsy vs Midjourney", href: "/vs/midjourney" },
+    { label: "Megsy vs Lovable", href: "/vs/lovable" },
+  ],
   Company: [
     { label: "Security", href: "/security" },
     { label: "Support", href: "/support" },
@@ -93,7 +104,7 @@ const LandingFooter = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="grid grid-cols-2 gap-10 md:grid-cols-6"
+          className="grid grid-cols-2 gap-10 md:grid-cols-4 lg:grid-cols-9"
         >
           {/* Brand column */}
           <div className="col-span-2">
